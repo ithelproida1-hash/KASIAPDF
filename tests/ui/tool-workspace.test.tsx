@@ -42,6 +42,21 @@ beforeEach(() => {
 });
 
 describe("ToolWorkspace", () => {
+  it.each([
+    ["merge-pdf", "Merge PDF", "Merge PDFs"],
+    ["split-pdf", "Split PDF", "Split PDF"],
+    ["compress-pdf", "Compress PDF", "Compress PDF"],
+    ["rotate-pdf", "Rotate PDF", "Rotate PDF"],
+    ["jpg-to-pdf", "JPG to PDF", "Create PDF"],
+    ["pdf-to-jpg", "PDF to JPG", "Convert to images"],
+  ])("renders the %s workspace with its primary action disabled", (toolId, name, action) => {
+    const { container } = render(<ToolWorkspace toolId={toolId} />);
+
+    expect(screen.getByRole("heading", { level: 1, name })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(`^${action}$`, "i") })).toBeDisabled();
+    expect(container.querySelector('input[type="file"]')).toBeTruthy();
+  });
+
   it("renders the tool, uploader and settings", () => {
     render(<ToolWorkspace toolId="merge-pdf" />);
 

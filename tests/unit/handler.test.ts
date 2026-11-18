@@ -118,6 +118,106 @@ describe("PDF tool handler", () => {
     expect(options).toMatchObject({ sortType: "orderProvided", generateToc: false });
   });
 
+  it("calls the engine with the expected options for every Phase 1 tool", async () => {
+    const cases = [
+      {
+        tool: "compress-pdf",
+        files: ["pdfs/sample-a.pdf"],
+        values: { optimizeLevel: "7", grayscale: "true", linearize: "true" },
+        method: "compressPdf",
+        options: { optimizeLevel: 7, grayscale: true, linearize: true },
+        filename: "compressed.pdf",
+      },
+      {
+        tool: "rotate-pdf",
+        files: ["pdfs/sample-a.pdf"],
+        values: { angle: "270" },
+        method: "rotatePdf",
+        options: { angle: 270 },
+        filename: "rotated.pdf",
+      },
+      {
+        tool: "jpg-to-pdf",
+        files: ["images/pixel.jpg", "images/pixel.png"],
+        values: { fitOption: "fitDocumentToPage", colorType: "greyscale", autoRotate: "true" },
+        method: "imagesToPdf",
+        options: {
+          fitOption: "fitDocumentToPage",
+          colorType: "greyscale",
+          autoRotate: true,
+        },
+        filename: "images.pdf",
+      },
+      {
+        tool: "pdf-to-jpg",
+        files: ["pdfs/sample-a.pdf"],
+        values: {
+          imageFormat: "png",
+          dpi: "150",
+          singleOrMultiple: "single",
+          colorType: "greyscale",
+        },
+        method: "pdfToImages",
+        options: {
+          imageFormat: "png",
+          dpi: 150,
+          singleOrMultiple: "single",
+          colorType: "greyscale",
+        },
+        filename: "page-image.jpg",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const response = await handlePdfToolRequest(
+        buildRequest(
+          testCase.tool,
+          testCase.files.map((file) => fixtureFile(file)),
+          testCase.values,
+        ),
+        testCase.tool,
+      );
+
+      expect(response.status, testCase.tool).toBe(200);
+      expect(response.headers.get("content-disposition"), testCase.tool).toContain(
+        testCase.filename,
+      );
+
+      const spy = mocks[testCase.method] as ReturnType<typeof vi.fn>;
+      const [, options] = spy.mock.calls.at(-1) as [unknown, unknown];
+      expect(options, testCase.tool).toEqual(testCase.options);
+    }
+  });
+
+  it("maps engine rejections for every Phase 1 tool", async () => {
+    const cases = [
+      { tool: "merge-pdf", files: ["pdfs/sample-a.pdf", "pdfs/sample-b.pdf"], method: "mergePdfs" },
+      { tool: "split-pdf", files: ["pdfs/sample-a.pdf"], method: "splitPdf" },
+      { tool: "compress-pdf", files: ["pdfs/sample-a.pdf"], method: "compressPdf" },
+      { tool: "rotate-pdf", files: ["pdfs/sample-a.pdf"], method: "rotatePdf" },
+      { tool: "jpg-to-pdf", files: ["images/pixel.jpg"], method: "imagesToPdf" },
+      { tool: "pdf-to-jpg", files: ["pdfs/sample-a.pdf"], method: "pdfToImages" },
+    ] as const;
+
+    for (const testCase of cases) {
+      const spy = mocks[testCase.method] as ReturnType<typeof vi.fn>;
+      spy.mockRejectedValueOnce(new AppError("STIRLING_REJECTED", "upstream said no"));
+
+      const response = await handlePdfToolRequest(
+        buildRequest(
+          testCase.tool,
+          testCase.files.map((file) => fixtureFile(file)),
+        ),
+        testCase.tool,
+      );
+      const body = (await response.json()) as { error: { code: string; message: string } };
+
+      expect(response.status, testCase.tool).toBe(422);
+      expect(body.error.code, testCase.tool).toBe("STIRLING_REJECTED");
+      expect(JSON.stringify(body), testCase.tool).not.toContain("upstream said no");
+    }
+  });
+
   it("sanitises uploaded filenames before forwarding them", async () => {
     const request = buildRequest("merge-pdf", [
       fixtureFile("pdfs/sample-a.pdf", { name: "../../evil name.pdf" }),
