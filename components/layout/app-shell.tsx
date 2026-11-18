@@ -102,12 +102,27 @@ export function AppShell({
           </main>
 
           <footer className="border-t px-4 py-5 sm:px-6">
-            <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col gap-1.5 text-[11px] sm:flex-row sm:items-center sm:justify-between">
-              <p>
-                Confidential files are processed on company infrastructure. Nothing is sent to
-                third-party AI services or analytics.
-              </p>
-              <p className="shrink-0 font-mono">v{appVersion}</p>
+            <div className="text-muted-foreground mx-auto max-w-6xl space-y-2 text-[11px]">
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  Confidential files are processed on company infrastructure. Nothing is sent to
+                  third-party AI services or analytics.
+                </p>
+                <p className="shrink-0 font-mono">v{appVersion}</p>
+              </div>
+              <div className="border-border/60 flex flex-col gap-1 border-t pt-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-foreground/70">
+                  Developed by <span className="font-medium">Sanjay Nayak</span> · All rights
+                  reserved
+                </p>
+                <p>
+                  Made with{" "}
+                  <span role="img" aria-label="love">
+                    ❤️
+                  </span>{" "}
+                  in India · For internal use only
+                </p>
+              </div>
             </div>
           </footer>
         </div>

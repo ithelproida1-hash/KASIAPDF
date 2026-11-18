@@ -10,6 +10,36 @@ const SAMPLE_PDF = path.join(FIXTURES, "pdfs", "sample-a.pdf");
 const FAKE_RESULT = readFileSync(SAMPLE_PDF);
 
 test.describe("Phase 1 smoke", () => {
+  test("shows developer credits and paints fireworks on click", async ({ page }) => {
+    await page.goto("/dashboard");
+
+    await expect(page.getByText("Developed by Sanjay Nayak")).toBeVisible();
+    await expect(page.getByText(/Made with/)).toContainText("in India");
+    await expect(page.getByText(/For internal use only/)).toBeVisible();
+
+    await page.mouse.click(480, 320);
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const canvas = document.querySelector<HTMLCanvasElement>(
+              '[data-testid="click-fireworks"]',
+            );
+            const context = canvas?.getContext("2d");
+            if (!canvas || !context) return false;
+
+            const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+            for (let index = 3; index < data.length; index += 4) {
+              if (data[index] !== 0) return true;
+            }
+            return false;
+          }),
+        { timeout: 2_000 },
+      )
+      .toBe(true);
+  });
+
   test("dashboard lists tools and filters by search", async ({ page }) => {
     await page.goto("/dashboard");
 

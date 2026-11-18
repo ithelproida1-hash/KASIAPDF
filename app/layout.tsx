@@ -3,6 +3,7 @@ import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { ClickFireworks } from "@/components/effects/click-fireworks";
 import { Toaster } from "@/components/ui/sonner";
 import { getPublicConfig } from "@/lib/config/env";
 
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AppShell appName={publicConfig.appName} appVersion={publicConfig.appVersion}>
             {children}
           </AppShell>
+          <ClickFireworks />
           <Toaster />
         </ThemeProvider>
       </body>
