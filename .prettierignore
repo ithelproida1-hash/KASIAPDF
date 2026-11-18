@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+*.tsbuildinfo
+Plan.txt
+AGENTS.md
+tests/fixtures
+test-results

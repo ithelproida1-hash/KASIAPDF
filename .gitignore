@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+credentials.json
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Temporary / uploaded documents
+tmp/
+temp/
+uploads/
+*.tmp
+tests/tmp/
+# Root-level scratch PDFs are never part of the app (fixtures live in tests/)
+/*.pdf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
