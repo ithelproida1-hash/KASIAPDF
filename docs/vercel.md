@@ -26,21 +26,20 @@ intended for local/self-hosted use. On Vercel:
 If large files are a hard requirement now, host the Next.js server on a VM/container
 instead of Vercel; the rest of this guide still applies except the platform limit.
 
-## 1. Put the project on GitHub
+## 1. Connect the existing repository to GitHub
 
-The repository is not initialised yet. From the project folder:
+This workspace is already a Git repository. If `git remote -v` is empty, create a
+private repository in GitHub (without an initial README, licence or `.gitignore`) and
+connect it from the project folder:
 
 ```powershell
-git init
-git add .
-git commit -m "feat: phase 1 PDF platform"
-git branch -M main
 git remote add origin https://github.com/<org>/<repo>.git
-git push -u origin main
+git push -u origin HEAD
 ```
 
-Before pushing, confirm `.env.local`, tunnel credentials and service tokens are not
-staged:
+Review `git status --short` and commit only the intended files before pushing. Avoid
+`git add .` in a worktree with unrelated or unreviewed changes. Before committing,
+confirm `.env.local`, tunnel credentials and service tokens are not staged:
 
 ```powershell
 git status --short
@@ -147,16 +146,18 @@ not. Check the Windows machine first.
 
 Run through this checklist after the first deploy and after any engine/tunnel change:
 
-1. `/dashboard` loads and shows 6 available tools.
+1. `/dashboard` loads and lists the available tools.
 2. `/admin` shows the engine as **connected**.
 3. Merge two small PDFs (< 2 MB total) and download the result.
 4. Split a PDF, compress it and rotate it; confirm each download opens.
 5. Convert a JPG to PDF and a PDF to JPG.
-6. Upload a `.txt` renamed to `.pdf`; expect a safe `415`/`422` error.
-7. Upload a file above the configured limit; expect a clear size error (or the Vercel
+6. Convert a scanned PDF to Word with OCR enabled; verify the `.docx` opens and
+   contains recognized text. Also confirm OCR PDF still returns a searchable PDF.
+7. Upload a `.txt` renamed to `.pdf`; expect a safe `415`/`422` error.
+8. Upload a file above the configured limit; expect a clear size error (or the Vercel
    platform rejection described in section 0).
-8. Confirm `/api/health` and error responses contain no URLs, keys or filenames.
-9. Check **Vercel → Logs** for the request IDs and durations; no document contents
+9. Confirm `/api/health` and error responses contain no URLs, keys or filenames.
+10. Check **Vercel → Logs** for the request IDs and durations; no document contents
    should appear.
 
 ## 8. Operations

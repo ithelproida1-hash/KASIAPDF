@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 
+import { PresenceHeartbeat } from "@/components/analytics/presence-heartbeat";
 import { AppShell } from "@/components/layout/app-shell";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { ClickFireworks } from "@/components/effects/click-fireworks";
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     default: appName,
     template: `%s · ${appName}`,
   },
-  description: "Internal, self-hosted PDF workspace for company documents.",
+  description: "Internal, self-hosted PDF workspace for Jindal Kasia documents.",
   applicationName: appName,
   robots: {
     index: false,
@@ -68,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </AppShell>
           <ClickFireworks />
+          <PresenceHeartbeat />
           <Toaster />
         </ThemeProvider>
       </body>

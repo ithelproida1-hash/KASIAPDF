@@ -28,6 +28,7 @@ export default defineConfig({
     env: {
       STIRLING_PDF_URL: "http://127.0.0.1:9", // unreachable on purpose
       STIRLING_HEALTH_TIMEOUT_MS: "1000",
+      UPLOAD_BACKUP_DIR: "off",
     },
   },
 });

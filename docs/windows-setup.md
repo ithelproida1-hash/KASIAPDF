@@ -46,7 +46,7 @@ updated.
      -v "C:\StirlingPDF\trainingData:/usr/share/tessdata" `
      -v "C:\StirlingPDF\extraConfigs:/configs" `
      -v "C:\StirlingPDF\logs:/logs" `
-     -e DOCKER_ENABLE_SECURITY=false `
+     -e SECURITY_ENABLELOGIN=false `
      stirlingtools/stirling-pdf:latest
    ```
 
@@ -124,9 +124,14 @@ Invoke-WebRequest http://localhost:8080/v1/api-docs -UseBasicParsing |
   Select-Object -ExpandProperty StatusCode
 ```
 
-The six endpoints used by Phase 1 are listed in
+The endpoints used by the app are listed in
 [`lib/stirling/endpoints.ts`](../lib/stirling/endpoints.ts). Re-verify them against
 your installed version before upgrading.
+
+> **Stirling-PDF 3.x:** `DOCKER_ENABLE_SECURITY` is obsolete. The container always
+> starts with the `security` profile, so `SECURITY_ENABLELOGIN=false` is what keeps
+> the internal API key-free. Without it, every tool call returns HTTP 401 and the
+> app reports a credentials error.
 
 ## 3. Optional: enable API key authentication
 
@@ -134,7 +139,7 @@ If the engine will be reachable through a tunnel, add authentication. With Docke
 set security variables in the `docker run` command (or a compose file):
 
 ```powershell
--e DOCKER_ENABLE_SECURITY=true -e SECURITY_ENABLELOGIN=true
+-e SECURITY_ENABLELOGIN=true
 ```
 
 Then:
@@ -155,10 +160,11 @@ If you protect the tunnel with Cloudflare Access instead, see
   container recreation.
 - JAR: keep the working directory (`C:\StirlingPDF`) backed up; configuration and
   tessdata live alongside the JAR or in its configured directories.
-
-Phase 1 sends no files for long-term storage. Stirling may use its own temporary
-working directory while processing; clear it if disk usage grows (see Stirling's
-documentation for `system.tempFileManagement`).
+- App: every accepted upload is copied to `storage/uploads` (grouped by date) before
+  it is processed. Set `UPLOAD_BACKUP_DIR` to an absolute path to keep backups on a
+  different drive, or to `off` to disable the archive. Stirling may also use its own
+  temporary working directory while processing; clear it if disk usage grows (see
+  Stirling's documentation for `system.tempFileManagement`).
 
 ## 5. Windows Firewall
 
@@ -202,6 +208,9 @@ corepack pnpm dev
 
 Open <http://localhost:3000/admin>. The engine should show **connected**. If it shows
 disconnected, check the app terminal for a redacted `STIRLING_UNAVAILABLE` log line.
+
+To start the app and engine automatically at sign-in, see
+[autostart.md](autostart.md).
 
 ## 7. Expose it to Vercel
 

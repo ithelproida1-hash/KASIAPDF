@@ -119,9 +119,9 @@ export function PrivacyNote() {
     <div className="text-muted-foreground flex items-start gap-3 rounded-xl border border-dashed px-4 py-3.5 text-[13px]">
       <SparklesIcon className="text-primary/70 mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <p>
-        <span className="text-foreground font-medium">Privacy by default.</span> Uploads are held in
-        memory for the duration of the request only. No document content is logged, stored, or sent
-        outside the company network.
+        <span className="text-foreground font-medium">Private by design.</span> Uploads are
+        processed on the company machine and archived in a local backup folder. Document content
+        is never sent to third-party AI or analytics services.
       </p>
     </div>
   );

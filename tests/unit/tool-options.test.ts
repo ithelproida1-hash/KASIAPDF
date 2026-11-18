@@ -13,10 +13,25 @@ function valuesFor(toolId: keyof typeof TOOL_FORMS) {
 }
 
 describe("tool form configuration", () => {
+  /** Destructive or secret-bearing tools deliberately start empty. */
+  const REQUIRES_USER_INPUT = new Set([
+    "remove-pages",
+    "protect-pdf",
+    "redact-pdf",
+    "edit-pdf",
+    "sign-pdf",
+    "web-to-pdf",
+  ]);
+
   it("has valid defaults for every implemented tool", () => {
     for (const [toolId, config] of Object.entries(TOOL_FORMS)) {
       const result = config.schema.safeParse(config.defaults);
-      expect(result.success, `${toolId} defaults must validate`).toBe(true);
+
+      if (REQUIRES_USER_INPUT.has(toolId)) {
+        expect(result.success, `${toolId} must require user input`).toBe(false);
+      } else {
+        expect(result.success, `${toolId} defaults must validate`).toBe(true);
+      }
     }
   });
 
@@ -31,7 +46,9 @@ describe("tool form configuration", () => {
 
   it("exposes forms only for implemented tools", () => {
     expect(hasToolForm("merge-pdf")).toBe(true);
-    expect(hasToolForm("watermark-pdf")).toBe(false);
+    expect(hasToolForm("watermark-pdf")).toBe(true);
+    expect(hasToolForm("edit-pdf")).toBe(true);
+    expect(hasToolForm("ai-summarize")).toBe(false);
     expect(getToolForm("merge-pdf")).toBeDefined();
     expect(getToolForm("rotate-pdf")).toBeDefined();
   });
@@ -66,6 +83,22 @@ describe("split page selection", () => {
 });
 
 describe("numeric and boolean options", () => {
+  it("enables OCR for scanned PDF-to-Word conversions and validates its language", () => {
+    const config = getToolForm("pdf-to-word")!;
+
+    expect(validateToolValues(config, valuesFor("pdf-to-word")).success).toBe(true);
+    expect(
+      validateToolValues(config, { ...valuesFor("pdf-to-word"), languages: "unsupported" })
+        .success,
+    ).toBe(false);
+    expect(
+      validateToolValues(config, {
+        ...valuesFor("pdf-to-word"),
+        ocrBeforeConversion: false,
+      }).success,
+    ).toBe(true);
+  });
+
   it("enforces compression bounds", () => {
     const config = getToolForm("compress-pdf")!;
 
@@ -99,6 +132,100 @@ describe("numeric and boolean options", () => {
     expect(validateToolValues(config, { ...valuesFor("pdf-to-jpg"), dpi: 900 }).success).toBe(
       false,
     );
+  });
+});
+
+describe("page editing options", () => {
+  it("requires at least one page to remove and rejects 'all'", () => {
+    const config = getToolForm("remove-pages")!;
+
+    expect(validateToolValues(config, { pageNumbers: "" }).success).toBe(false);
+    expect(validateToolValues(config, { pageNumbers: "all" }).success).toBe(false);
+    expect(validateToolValues(config, { pageNumbers: "2,5-9" }).success).toBe(true);
+  });
+
+  it("validates custom orders and duplicate counts", () => {
+    const config = getToolForm("organize-pdf")!;
+
+    expect(
+      validateToolValues(config, { ...valuesFor("organize-pdf"), pageNumbers: "3,1,2" }).success,
+    ).toBe(true);
+    expect(
+      validateToolValues(config, { ...valuesFor("organize-pdf"), pageNumbers: "nope" }).success,
+    ).toBe(false);
+    expect(
+      validateToolValues(config, {
+        ...valuesFor("organize-pdf"),
+        customMode: "DUPLICATE",
+        pageNumbers: "2",
+      }).success,
+    ).toBe(true);
+    expect(
+      validateToolValues(config, {
+        ...valuesFor("organize-pdf"),
+        customMode: "DUPLICATE",
+        pageNumbers: "11",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires crop dimensions unless auto-crop is enabled", () => {
+    const config = getToolForm("crop-pdf")!;
+
+    expect(validateToolValues(config, { ...valuesFor("crop-pdf"), autoCrop: true }).success).toBe(
+      true,
+    );
+    expect(
+      validateToolValues(config, {
+        ...valuesFor("crop-pdf"),
+        autoCrop: false,
+        width: 0,
+        height: 0,
+      }).success,
+    ).toBe(false);
+    expect(
+      validateToolValues(config, {
+        ...valuesFor("crop-pdf"),
+        autoCrop: false,
+        width: 500,
+        height: 700,
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe("security options", () => {
+  it("requires a protection password", () => {
+    const config = getToolForm("protect-pdf")!;
+
+    expect(validateToolValues(config, valuesFor("protect-pdf")).success).toBe(false);
+    expect(
+      validateToolValues(config, { ...valuesFor("protect-pdf"), password: "secret" }).success,
+    ).toBe(true);
+  });
+
+  it("requires at least one redaction term", () => {
+    const config = getToolForm("redact-pdf")!;
+
+    expect(validateToolValues(config, valuesFor("redact-pdf")).success).toBe(false);
+    expect(
+      validateToolValues(config, { ...valuesFor("redact-pdf"), listOfText: "   " }).success,
+    ).toBe(false);
+    expect(
+      validateToolValues(config, { ...valuesFor("redact-pdf"), listOfText: "Order 1234" }).success,
+    ).toBe(true);
+  });
+
+  it("validates watermark colours and opacity", () => {
+    const config = getToolForm("watermark-pdf")!;
+
+    expect(validateToolValues(config, valuesFor("watermark-pdf")).success).toBe(true);
+    expect(
+      validateToolValues(config, { ...valuesFor("watermark-pdf"), customColor: "blue" }).success,
+    ).toBe(false);
+    expect(
+      validateToolValues(config, { ...valuesFor("watermark-pdf"), opacity: 0 }).success,
+    ).toBe(false);
   });
 });
 

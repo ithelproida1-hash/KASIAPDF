@@ -5,16 +5,35 @@ import { logger } from "@/lib/logging/logger";
 import { STIRLING_ENDPOINTS } from "./endpoints";
 import { mapUpstreamFailure } from "./errors";
 import type {
+  AddPasswordOptions,
+  AddStampOptions,
+  CertSignOptions,
   CompressOptions,
+  CropOptions,
+  FormExtractOptions,
+  FormFillOptions,
+  HtmlToPdfOptions,
   ImageToPdfOptions,
   MergeOptions,
+  OcrOptions,
+  PageNumberOptions,
+  PdfTextOptions,
   PdfToImageOptions,
+  PdfToPdfAOptions,
+  PdfToPresentationOptions,
+  PdfToWordOptions,
+  PipelineOptions,
+  RedactOptions,
+  RemovePagesOptions,
+  RemovePasswordOptions,
+  RearrangePagesOptions,
   RotateOptions,
   SplitOptions,
   StirlingFileResult,
   StirlingHealth,
   StirlingStatusPayload,
   UploadedFile,
+  WatermarkOptions,
 } from "./types";
 
 type StirlingConfig = ServerConfig["stirling"];
@@ -38,6 +57,11 @@ function appendNumber(form: FormData, field: string, value: number | undefined):
 function appendString(form: FormData, field: string, value: string | undefined): void {
   if (value === undefined || value === "") return;
   form.append(field, value);
+}
+
+/** True when the payload starts with the PDF signature (`%PDF-`). */
+function looksLikePdf(bytes: Uint8Array): boolean {
+  return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
 }
 
 /**
@@ -156,6 +180,15 @@ export class StirlingClient {
       (response.headers.get("content-type") ?? "application/octet-stream").split(";")[0]?.trim() ??
       "application/octet-stream";
 
+    // Some converters return 204 when the document has no content they can use.
+    if (response.status === 204) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new AppError("PROCESSING_FAILED", "Stirling returned no content", {
+        userMessage: "The processing engine found nothing it could convert in this file.",
+        details: { upstreamStatus: 204 },
+      });
+    }
+
     // Stirling serves JSON/HTML bodies for some failures even with HTTP 200.
     if (contentType.includes("application/json") || contentType.includes("text/html")) {
       await response.body?.cancel().catch(() => undefined);
@@ -170,9 +203,19 @@ export class StirlingClient {
       throw new AppError("PROCESSING_FAILED", "Stirling returned an empty body");
     }
 
+    const bytes = new Uint8Array(buffer);
+
+    // Pipeline outputs are served as application/octet-stream even when the
+    // payload is a PDF. Sniff the magic bytes so filenames and previews stay
+    // correct for the browser.
+    const resolvedContentType =
+      contentType === "application/octet-stream" && looksLikePdf(bytes)
+        ? "application/pdf"
+        : contentType;
+
     return {
-      bytes: new Uint8Array(buffer),
-      contentType,
+      bytes,
+      contentType: resolvedContentType,
       contentDisposition: response.headers.get("content-disposition") ?? undefined,
     };
   }
@@ -248,6 +291,300 @@ export class StirlingClient {
     appendString(form, "pageNumbers", options.pageNumbers ?? "all");
 
     return this.postForm(STIRLING_ENDPOINTS.pdfToImages, form);
+  }
+
+  async removePages(file: UploadedFile, options: RemovePagesOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "pageNumbers", options.pageNumbers);
+
+    return this.postForm(STIRLING_ENDPOINTS.removePages, form);
+  }
+
+  async rearrangePages(
+    file: UploadedFile,
+    options: RearrangePagesOptions,
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "pageNumbers", options.pageNumbers);
+    appendString(form, "customMode", options.customMode);
+
+    return this.postForm(STIRLING_ENDPOINTS.rearrangePages, form);
+  }
+
+  async cropPdf(file: UploadedFile, options: CropOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "pageNumbers", options.pageNumbers ?? "all");
+    appendBoolean(form, "autoCrop", options.autoCrop ?? false);
+    appendBoolean(form, "removeDataOutsideCrop", options.removeDataOutsideCrop ?? false);
+
+    if (!options.autoCrop) {
+      appendNumber(form, "x", options.x ?? 0);
+      appendNumber(form, "y", options.y ?? 0);
+      appendNumber(form, "width", options.width);
+      appendNumber(form, "height", options.height);
+    }
+
+    return this.postForm(STIRLING_ENDPOINTS.cropPdf, form);
+  }
+
+  async pdfToWord(file: UploadedFile, options: PdfToWordOptions = {}): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "outputFormat", options.outputFormat ?? "docx");
+
+    return this.postForm(STIRLING_ENDPOINTS.pdfToWord, form);
+  }
+
+  async pdfToPresentation(
+    file: UploadedFile,
+    options: PdfToPresentationOptions = {},
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "outputFormat", options.outputFormat ?? "pptx");
+
+    return this.postForm(STIRLING_ENDPOINTS.pdfToPresentation, form);
+  }
+
+  async pdfToExcel(file: UploadedFile): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+
+    // The LibreOffice path returns an empty 204 for most PDFs; Stirling Office
+    // Convert extracts the tables reliably and is enabled on this deployment.
+    return this.postForm(`${STIRLING_ENDPOINTS.pdfToExcel}?useStirlingOfficeConvert=true`, form);
+  }
+
+  async fileToPdf(file: UploadedFile): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+
+    return this.postForm(STIRLING_ENDPOINTS.fileToPdf, form);
+  }
+
+  async htmlToPdf(file: UploadedFile, options: HtmlToPdfOptions = {}): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendNumber(form, "zoom", options.zoom ?? 1);
+
+    return this.postForm(STIRLING_ENDPOINTS.htmlToPdf, form);
+  }
+
+  async pdfToPdfA(file: UploadedFile, options: PdfToPdfAOptions = {}): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "outputFormat", options.outputFormat ?? "pdfa-2b");
+    appendBoolean(form, "pdfUa", options.pdfUa ?? false);
+    appendBoolean(form, "strict", options.strict ?? false);
+
+    return this.postForm(STIRLING_ENDPOINTS.pdfToPdfA, form);
+  }
+
+  async addWatermark(
+    file: UploadedFile,
+    options: WatermarkOptions,
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "watermarkType", "text");
+    appendString(form, "watermarkText", options.watermarkText);
+    appendNumber(form, "fontSize", options.fontSize ?? 36);
+    appendNumber(form, "rotation", options.rotation ?? 45);
+    appendNumber(form, "opacity", options.opacity ?? 0.25);
+    appendString(form, "customColor", options.customColor ?? "#d3d3d3");
+    appendBoolean(form, "convertPDFToImage", options.convertPDFToImage ?? false);
+
+    return this.postForm(STIRLING_ENDPOINTS.addWatermark, form);
+  }
+
+  async addPageNumbers(
+    file: UploadedFile,
+    options: PageNumberOptions,
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "pageNumbers", options.pageNumbers);
+    appendString(form, "pagesToNumber", options.pageNumbers);
+    appendString(form, "fontType", options.fontType ?? "helvetica");
+    appendNumber(form, "position", options.position ?? 8);
+    appendString(form, "customText", options.customText ?? "{n}");
+    appendNumber(form, "startingNumber", options.startingNumber ?? 1);
+    appendNumber(form, "fontSize", options.fontSize ?? 12);
+    appendString(form, "fontColor", options.fontColor ?? "#000000");
+
+    return this.postForm(STIRLING_ENDPOINTS.addPageNumbers, form);
+  }
+
+  async removePassword(
+    file: UploadedFile,
+    options: RemovePasswordOptions,
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "password", options.password);
+    appendBoolean(form, "removeAll", options.removeAll ?? true);
+
+    return this.postForm(STIRLING_ENDPOINTS.removePassword, form);
+  }
+
+  async addPassword(file: UploadedFile, options: AddPasswordOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "password", options.password);
+    appendString(form, "ownerPassword", options.ownerPassword || options.password);
+    appendNumber(form, "keyLength", options.keyLength ?? 256);
+    appendBoolean(form, "preventPrinting", options.preventPrinting ?? false);
+    appendBoolean(form, "preventModify", options.preventModify ?? false);
+    appendBoolean(form, "preventExtractContent", options.preventExtractContent ?? false);
+
+    return this.postForm(STIRLING_ENDPOINTS.addPassword, form);
+  }
+
+  async ocrPdf(file: UploadedFile, options: OcrOptions = {}): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "languages", options.languages ?? "eng");
+    appendString(form, "ocrType", options.ocrType ?? "skip-text");
+    appendBoolean(form, "deskew", options.deskew ?? false);
+    appendBoolean(form, "rotatePages", options.rotatePages ?? false);
+    appendBoolean(form, "clean", options.clean ?? false);
+
+    return this.postForm(STIRLING_ENDPOINTS.ocrPdf, form);
+  }
+
+  async repairPdf(file: UploadedFile): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+
+    return this.postForm(STIRLING_ENDPOINTS.repairPdf, form);
+  }
+
+  async autoRedact(file: UploadedFile, options: RedactOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "listOfText", options.listOfText);
+    appendBoolean(form, "useRegex", options.useRegex ?? false);
+    appendBoolean(form, "wholeWordSearch", options.wholeWordSearch ?? false);
+    appendBoolean(form, "caseSensitive", options.caseSensitive ?? false);
+    appendString(form, "redactColor", options.redactColor ?? "#000000");
+    appendNumber(form, "customPadding", 0);
+    appendBoolean(form, "convertPDFToImage", options.convertPDFToImage ?? false);
+
+    return this.postForm(STIRLING_ENDPOINTS.autoRedact, form);
+  }
+
+  async fillForm(file: UploadedFile, options: FormFillOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    // The form endpoints name the upload field "file", unlike most converters.
+    appendFile(form, "file", file);
+    appendString(form, "data", options.data);
+    appendBoolean(form, "flatten", options.flatten ?? false);
+
+    try {
+      return await this.postForm(STIRLING_ENDPOINTS.fillForm, form);
+    } catch (error) {
+      // Stirling throws an internal 500 ("No AcroForm present in document") for
+      // ordinary PDFs that simply have no form fields. That is a property of
+      // the upload, not a transient engine fault, so do not offer a retry.
+      if (error instanceof AppError && error.details?.upstreamStatus === 500) {
+        throw new AppError("INVALID_PDF", "Uploaded PDF has no AcroForm", {
+          userMessage:
+            "This PDF has no fillable form fields. Use Export CSV to see the fields it does contain.",
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  async extractFormCsv(
+    file: UploadedFile,
+    options: FormExtractOptions = {},
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "file", file);
+    appendString(form, "data", options.data);
+
+    return this.postForm(STIRLING_ENDPOINTS.extractFormCsv, form);
+  }
+
+  async extractFormXlsx(
+    file: UploadedFile,
+    options: FormExtractOptions = {},
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "file", file);
+    appendString(form, "data", options.data);
+
+    return this.postForm(STIRLING_ENDPOINTS.extractFormXlsx, form);
+  }
+
+  async addStamp(file: UploadedFile, options: AddStampOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "pageNumbers", options.pageNumbers ?? "all");
+    appendString(form, "stampType", options.stampType);
+    appendString(form, "stampText", options.stampText);
+    appendNumber(form, "position", options.position ?? 8);
+    appendNumber(form, "fontSize", options.fontSize ?? 24);
+    appendNumber(form, "opacity", options.opacity ?? 0.8);
+    appendString(form, "customColor", options.customColor ?? "#000000");
+    appendNumber(form, "rotation", options.rotation ?? 0);
+    appendString(form, "customMargin", options.customMargin ?? "medium");
+    appendNumber(form, "overrideX", options.overrideX ?? -1);
+    appendNumber(form, "overrideY", options.overrideY ?? -1);
+
+    if (options.stampImage) {
+      appendFile(form, "stampImage", options.stampImage);
+    }
+
+    return this.postForm(STIRLING_ENDPOINTS.addStamp, form);
+  }
+
+  async certSign(file: UploadedFile, options: CertSignOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "certType", options.certType);
+    appendBoolean(form, "showSignature", options.showSignature ?? true);
+    appendBoolean(form, "showLogo", options.showLogo ?? true);
+    appendString(form, "reason", options.reason);
+    appendString(form, "location", options.location);
+    appendString(form, "name", options.name);
+    appendNumber(form, "pageNumber", options.pageNumber ?? 1);
+
+    return this.postForm(STIRLING_ENDPOINTS.certSign, form);
+  }
+
+  async pdfToMarkdown(file: UploadedFile): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+
+    return this.postForm(STIRLING_ENDPOINTS.pdfToMarkdown, form);
+  }
+
+  async pdfToText(
+    file: UploadedFile,
+    options: PdfTextOptions = {},
+  ): Promise<StirlingFileResult> {
+    const form = new FormData();
+    appendFile(form, "fileInput", file);
+    appendString(form, "outputFormat", options.outputFormat ?? "txt");
+
+    return this.postForm(STIRLING_ENDPOINTS.pdfToText, form);
+  }
+
+  async pipeline(files: UploadedFile[], options: PipelineOptions): Promise<StirlingFileResult> {
+    const form = new FormData();
+    for (const file of files) {
+      appendFile(form, "fileInput", file);
+    }
+
+    form.append("json", JSON.stringify({ name: options.name, pipeline: options.pipeline }));
+
+    return this.postForm(STIRLING_ENDPOINTS.pipeline, form);
   }
 }
 

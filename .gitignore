@@ -29,6 +29,8 @@ blob-report/
 tmp/
 temp/
 uploads/
+storage/uploads/
+logs/
 *.tmp
 tests/tmp/
 # Root-level scratch PDFs are never part of the app (fixtures live in tests/)

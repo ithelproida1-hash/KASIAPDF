@@ -1,0 +1,11 @@
+# Generated PDFs and images are byte-sensitive (xref offsets, image tables).
+*.pdf binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.webp binary
+
+# Windows scripts should check out with CRLF; shell scripts with LF.
+*.ps1 text eol=crlf
+*.sh text eol=lf

@@ -25,8 +25,9 @@ sketch in `Plan.txt`, and what must change before the platform grows.
 - Only the Next.js server knows `STIRLING_PDF_URL`; the browser only calls same-origin
   routes. This satisfies the plan's rule that the browser must not call Stirling.
 - The engine stays behind an outbound tunnel. No inbound port forwarding is required.
-- Phase 1 is stateless: no database, no object storage, no temp files on disk. A file
-  exists as a `File`/`Blob` in memory for one request.
+- **Bounded local archive:** every accepted upload is copied to `storage/uploads`
+  (or `UPLOAD_BACKUP_DIR`) before processing, grouped by date. There is no database
+  or cloud object storage; processed results are streamed back and not persisted.
 
 ## 2. Module map
 
@@ -34,7 +35,7 @@ sketch in `Plan.txt`, and what must change before the platform grows.
 app/
   page.tsx                    redirect / marketing entry
   dashboard/page.tsx          catalogue + search
-  <tool>/page.tsx             six statically rendered tool shells
+  <tool>/page.tsx             a page for every available tool
   admin/page.tsx              internal engine/status view
   api/health/route.ts         public coarse health (503 when engine is down)
   api/admin/status/route.ts   detailed, secret-free status
@@ -53,10 +54,19 @@ lib/
   pdf/tools.ts                tool registry (single source of truth)
   pdf/tool-options.ts         declarative form schema + shared validation
   pdf/tool-specs.ts           tool id → verified engine call
+  pdf/compare.ts              line diff and HTML comparison report
+  pdf/web-capture.ts          SSRF-safe, DNS-pinned page fetch
   pdf/handler.ts              request orchestration
+  storage/upload-archive.ts   dated local backup of accepted uploads
   security/                   validation, SSRF guard, rate limiter
   stirling/                   typed client, endpoints, errors, types
   logging/, metrics.ts        structured logs and process-local counters
+
+scripts/
+  generate-fixtures.mjs       real PDF/form/image fixtures
+  start-app.ps1               production start (engine + Next.js)
+  install-autostart.ps1       registers the sign-in scheduled task
+  uninstall-autostart.ps1     removes the scheduled task
 
 tests/
   unit/                       pure modules and handler contracts
@@ -68,7 +78,7 @@ tests/
 
 The plan suggested one API folder per tool (`api/pdf/merge/route.ts`, etc.). We kept
 the public URLs but implemented a single registry-driven route,
-`app/api/pdf/[tool]/route.ts`. Six near-identical handlers would have duplicated
+`app/api/pdf/[tool]/route.ts`. Separate near-identical handlers would have duplicated
 validation, rate limiting and error formatting; the dynamic route keeps that logic in
 one place while the registry enforces which slugs are callable. This is the only
 intentional deviation from the proposed structure.
@@ -85,23 +95,26 @@ intentional deviation from the proposed structure.
    - MIME, extension and magic-byte agreement
    - PDF header check (`%PDF-`), image signature checks
    - filename sanitisation and deduplication
-6. **Option validation** — the same zod schema the UI uses; safe field-level message.
-7. **Rate limit** — fixed window per client IP, shared across tools.
-8. **Engine call** — `StirlingClient` posts multipart to the verified endpoint with a
+6. **Option validation** - the same zod schema the UI uses; safe field-level message.
+7. **Rate limit** - fixed window per client IP, shared across tools.
+8. **Upload archive** - accepted files are copied to a dated folder under
+   `UPLOAD_BACKUP_DIR`. Archive failures are logged and never block processing.
+9. **Engine call** - `StirlingClient` posts multipart to the verified endpoint with a
    timeout, `X-API-KEY` (if configured) and Access headers (if configured).
-9. **Response** — bytes are returned as an attachment with `no-store`, a sanitised
-   ASCII fallback filename and RFC 5987 UTF-8 filename. `X-Request-Id` is returned.
-10. **Logging/metrics** — one structured line per request; no filenames, URLs or
+10. **Response** - bytes are returned as an attachment with `no-store`, a sanitised
+    ASCII fallback filename and RFC 5987 UTF-8 filename. `X-Request-Id` is returned.
+11. **Logging/metrics** - one structured line per request; no filenames, URLs or
     document contents.
 
-Buffers are released when the response is garbage-collected; no copy is written to
-disk. Stirling itself may spool uploads in its container, which is outside this app's
-control (see its temporary-file settings).
+Buffers are released when the response is garbage-collected. Only the deliberate
+upload archive is written to disk; processed results are streamed back and never
+persisted. Stirling itself may spool uploads in its container, which is outside this
+app's control (see its temporary-file settings).
 
 ## 4. Tool registry
 
-`lib/pdf/tools.ts` holds all 35 tools with category, summary, status and, for the six
-active ones, a verified endpoint. Helpers:
+`lib/pdf/tools.ts` holds every tool with category, summary, status and, for available
+tools, a verified endpoint. Helpers:
 
 - `getToolBySlug`, `getAvailableTools`, `getPlannedTools`, `getNavigationGroups`
 - `hasToolForm` / `getToolForm` gate UI and API alike
@@ -161,7 +174,8 @@ Upstream response bodies are drained but never parsed into user-visible errors.
 
 - **SSRF**: `lib/security/ssrf.ts` blocks credentials, non-HTTP(S) schemes, loopback,
   private/link-local/metadata addresses, and requires an allowlist entry when one is
-  configured. It is used by URL-based tools (Phase 3), not by the fixed engine URL.
+  configured. Web to PDF resolves DNS, validates every address and pins the connection
+  to that address before fetching redirects.
 - **Tunnel protection**: optional Cloudflare Access service token headers, configured
   with `CLOUDFLARE_ACCESS_CLIENT_ID` / `CLOUDFLARE_ACCESS_CLIENT_SECRET`. Both must be
   present; the config parser rejects half-configured tokens.
@@ -186,17 +200,19 @@ Upstream response bodies are drained but never parsed into user-visible errors.
 - **Cold starts** add latency to the first request after idle.
 - **Memory**: `request.formData()` buffers the whole upload. The 250 MiB default total
   is within a 1 GiB Vercel function, but keep headroom for multipart overhead.
-- **Engine version drift**: endpoints were verified against OpenAPI v3.2.1. Before
+- **Engine version drift**: endpoints were verified against OpenAPI v3.3.0. Before
   upgrading Stirling, re-check `/v1/api-docs` on the installed instance.
 
 ## 8. Testing strategy
 
 - Unit: registry, option schemas, file validation, SSRF, rate limiting, errors,
-  Stirling client (headers, timeouts, empty bodies, upstream failures), env parsing.
+  Stirling client (headers, timeouts, empty bodies, upstream failures), upload
+  archive, env parsing.
 - Integration: the real route handler with `fetch` mocked at the engine boundary,
   including rate-limit and empty-response paths.
 - UI: upload flow, option changes, success state, error state (jsdom).
-- E2E: dashboard search, merge flow, safe error rendering (Chromium, network mocked).
+- E2E: dashboard search, merge flow, web-to-PDF flow, tool pages, safe error
+  rendering (Chromium, network mocked).
 
 The engine itself is never required for tests. Live verification is a manual step:
 start Stirling, run `pnpm dev`, upload a sample, and check `/admin` reports

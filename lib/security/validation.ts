@@ -6,6 +6,28 @@ import type { UploadedFile } from "@/lib/stirling/types";
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 
 /**
+ * Office formats are detected as generic archives, so the uploaded part keeps
+ * the MIME type implied by its accepted extension. This lets LibreOffice pick
+ * the right conversion path.
+ */
+const MIME_BY_EXTENSION: Record<string, string> = {
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".odt": "application/vnd.oasis.opendocument.text",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".odp": "application/vnd.oasis.opendocument.presentation",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+  ".csv": "text/csv",
+  ".rtf": "application/rtf",
+  ".txt": "text/plain",
+  ".html": "text/html",
+  ".htm": "text/html",
+};
+
+/**
  * Produces a safe, predictable filename:
  * - strips directory components (path traversal)
  * - removes control characters and characters invalid on Windows
@@ -162,14 +184,24 @@ export async function validateUploads(
       });
     }
 
-    const safeName = ensureExtension(
-      sanitizeFilename(file.name || "document"),
-      kind as Exclude<FileKind, "unknown">,
+    const safeName = sanitizeFilename(file.name || "document");
+    const acceptedExtensions = new Set(
+      input.accept
+        .toLowerCase()
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.startsWith(".")),
     );
+    const filename = acceptedExtensions.has(extensionOf(safeName))
+      ? safeName
+      : ensureExtension(safeName, kind as Exclude<FileKind, "unknown">);
+    const extension = extensionOf(filename);
+    const contentType =
+      MIME_BY_EXTENSION[extension] ?? FILE_KIND_INFO[kind as Exclude<FileKind, "unknown">].mime;
 
     files.push({
-      filename: safeName,
-      contentType: FILE_KIND_INFO[kind as Exclude<FileKind, "unknown">].mime,
+      filename,
+      contentType,
       bytes,
     });
   }

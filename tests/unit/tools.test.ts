@@ -21,10 +21,26 @@ describe("tool registry", () => {
   });
 
   it("gives every available tool a verified endpoint and a form", () => {
+    // Tools that genuinely have no settings still need a form config so the
+    // shared handler can validate an empty option set.
+    const optionlessTools = new Set([
+      "pdf-to-excel",
+      "word-to-pdf",
+      "powerpoint-to-pdf",
+      "excel-to-pdf",
+      "repair-pdf",
+      "pdf-to-markdown",
+    ]);
+
     for (const tool of getAvailableTools()) {
       expect(tool.endpoint, `${tool.id} endpoint`).toMatch(/^\/api\/v1\//);
       expect(hasToolForm(tool.id), `${tool.id} form config`).toBe(true);
-      expect(getToolForm(tool.id)?.fields.length, `${tool.id} fields`).toBeGreaterThan(0);
+
+      if (optionlessTools.has(tool.id)) {
+        expect(getToolForm(tool.id)?.fields.length, `${tool.id} fields`).toBe(0);
+      } else {
+        expect(getToolForm(tool.id)?.fields.length, `${tool.id} fields`).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -44,6 +60,51 @@ describe("tool registry", () => {
       "rotate-pdf",
       "jpg-to-pdf",
       "pdf-to-jpg",
+    ]) {
+      expect(available.has(id), id).toBe(true);
+    }
+  });
+
+  it("ships the Phase 2 tools with verified endpoints", () => {
+    const available = new Set(getAvailableTools().map((tool) => tool.id));
+
+    for (const id of [
+      "remove-pages",
+      "extract-pages",
+      "organize-pdf",
+      "pdf-to-word",
+      "pdf-to-powerpoint",
+      "pdf-to-excel",
+      "word-to-pdf",
+      "powerpoint-to-pdf",
+      "excel-to-pdf",
+      "html-to-pdf",
+      "pdf-to-pdfa",
+      "watermark-pdf",
+      "page-numbers",
+      "crop-pdf",
+      "unlock-pdf",
+      "protect-pdf",
+      "ocr-pdf",
+      "repair-pdf",
+      "redact-pdf",
+    ]) {
+      expect(available.has(id), id).toBe(true);
+    }
+  });
+
+  it("ships the remaining document tools with verified endpoints", () => {
+    const available = new Set(getAvailableTools().map((tool) => tool.id));
+
+    for (const id of [
+      "edit-pdf",
+      "pdf-forms",
+      "sign-pdf",
+      "compare-pdf",
+      "pdf-to-markdown",
+      "web-to-pdf",
+      "workflows",
+      "scan-pdf",
     ]) {
       expect(available.has(id), id).toBe(true);
     }

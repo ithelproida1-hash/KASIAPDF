@@ -3,7 +3,18 @@
  * Pure module: safe to import from both server and client code.
  */
 
-export type FileKind = "pdf" | "jpeg" | "png" | "webp" | "gif" | "tiff" | "bmp" | "zip" | "unknown";
+export type FileKind =
+  | "pdf"
+  | "jpeg"
+  | "png"
+  | "webp"
+  | "gif"
+  | "tiff"
+  | "bmp"
+  | "zip"
+  | "ole"
+  | "html"
+  | "unknown";
 
 export type FileKindInfo = {
   mime: string;
@@ -19,7 +30,13 @@ export const FILE_KIND_INFO: Record<Exclude<FileKind, "unknown">, FileKindInfo> 
   gif: { mime: "image/gif", extensions: [".gif"], label: "GIF image" },
   tiff: { mime: "image/tiff", extensions: [".tif", ".tiff"], label: "TIFF image" },
   bmp: { mime: "image/bmp", extensions: [".bmp"], label: "Bitmap image" },
-  zip: { mime: "application/zip", extensions: [".zip"], label: "ZIP archive" },
+  zip: { mime: "application/zip", extensions: [".zip"], label: "Office document or ZIP" },
+  ole: {
+    mime: "application/octet-stream",
+    extensions: [".doc", ".ppt", ".xls"],
+    label: "Legacy Office document",
+  },
+  html: { mime: "text/html", extensions: [".html", ".htm"], label: "HTML document" },
 };
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], offset = 0): boolean {
@@ -35,6 +52,21 @@ function matchesAscii(bytes: Uint8Array, text: string, offset = 0): boolean {
     bytes,
     [...text].map((char) => char.charCodeAt(0)),
     offset,
+  );
+}
+
+function looksLikeHtml(bytes: Uint8Array): boolean {
+  const head = new TextDecoder("utf-8", { fatal: false })
+    .decode(bytes.slice(0, 512))
+    .trimStart()
+    .toLowerCase();
+
+  return (
+    head.startsWith("<!doctype html") ||
+    head.startsWith("<html") ||
+    head.startsWith("<head") ||
+    head.startsWith("<body") ||
+    (head.startsWith("<?xml") && head.includes("<html"))
   );
 }
 
@@ -73,6 +105,15 @@ export function detectFileKind(bytes: Uint8Array): FileKind {
 
   if (startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) {
     return "zip";
+  }
+
+  // OLE compound document: legacy .doc, .ppt and .xls files.
+  if (startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) {
+    return "ole";
+  }
+
+  if (looksLikeHtml(bytes)) {
+    return "html";
   }
 
   return "unknown";

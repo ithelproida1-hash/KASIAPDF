@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import type { OptionField, ToolValues } from "@/lib/pdf/tool-options";
 import { cn } from "@/lib/utils";
 
@@ -28,13 +29,15 @@ export function ToolOptionsPanel({
   fieldError: FieldError | null;
   disabled?: boolean;
 }) {
-  if (fields.length === 0) {
+  const visibleFields = fields.filter((field) => isFieldVisible(field, values));
+
+  if (visibleFields.length === 0) {
     return <p className="text-muted-foreground text-sm">This tool has no extra settings.</p>;
   }
 
   return (
     <div className="space-y-5">
-      {fields.map((field) => (
+      {visibleFields.map((field) => (
         <OptionControl
           key={field.name}
           field={field}
@@ -46,6 +49,13 @@ export function ToolOptionsPanel({
       ))}
     </div>
   );
+}
+
+function isFieldVisible(field: OptionField, values: ToolValues): boolean {
+  if (!field.showWhen) return true;
+
+  const expected = field.showWhen.equals.map(String);
+  return expected.includes(String(values[field.showWhen.field] ?? ""));
 }
 
 function OptionControl({
@@ -191,6 +201,77 @@ function OptionControl({
         </NativeSelect>
         {field.hint ? (
           <p id={hintId} className="text-muted-foreground text-[11px] leading-relaxed">
+            {field.hint}
+          </p>
+        ) : null}
+        {error ? (
+          <p id={errorId} className="text-destructive text-[11px]">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------- Password
+  if (field.kind === "password") {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={id}>{field.label}</Label>
+        <Input
+          id={id}
+          type="password"
+          value={String(value ?? "")}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={field.placeholder}
+          disabled={disabled}
+          aria-describedby={
+            [field.hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") ||
+            undefined
+          }
+          aria-invalid={Boolean(error)}
+          autoComplete="new-password"
+        />
+        {field.hint ? (
+          <p id={hintId} className="text-muted-foreground text-[11px] leading-relaxed">
+            {field.hint}
+          </p>
+        ) : null}
+        {error ? (
+          <p id={errorId} className="text-destructive text-[11px]">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------- Textarea
+  if (field.kind === "textarea") {
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={id}>{field.label}</Label>
+        <Textarea
+          id={id}
+          value={String(value ?? "")}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={field.placeholder}
+          rows={field.rows ?? 4}
+          disabled={disabled}
+          aria-describedby={
+            [field.hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ") ||
+            undefined
+          }
+          aria-invalid={Boolean(error)}
+          spellCheck={false}
+          className="text-[13px]"
+        />
+        {field.hint ? (
+          <p
+            id={hintId}
+            className="text-muted-foreground flex items-start gap-1.5 text-[11px] leading-relaxed"
+          >
+            <InfoIcon className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
             {field.hint}
           </p>
         ) : null}

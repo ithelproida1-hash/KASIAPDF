@@ -60,4 +60,29 @@ describe("server environment", () => {
       }),
     ).toThrow(/MAX_TOTAL_UPLOAD_MB/);
   });
+
+  it("disables the upload backup during tests unless explicitly configured", () => {
+    const config = parseServerConfig({ NODE_ENV: "test" });
+    expect(config.backup.enabled).toBe(false);
+    expect(config.backup.directory).toBeNull();
+  });
+
+  it("enables a default upload backup outside tests", () => {
+    const config = parseServerConfig({ NODE_ENV: "production" });
+    expect(config.backup.enabled).toBe(true);
+    expect(config.backup.directory).toBe("storage/uploads");
+  });
+
+  it("honours a custom backup directory and explicit opt-out", () => {
+    const custom = parseServerConfig({
+      NODE_ENV: "production",
+      UPLOAD_BACKUP_DIR: "D:/PDF-Backups",
+    });
+    expect(custom.backup).toEqual({ enabled: true, directory: "D:/PDF-Backups" });
+
+    for (const value of ["", "off", "false", "none"]) {
+      const disabled = parseServerConfig({ NODE_ENV: "production", UPLOAD_BACKUP_DIR: value });
+      expect(disabled.backup.enabled, value).toBe(false);
+    }
+  });
 });

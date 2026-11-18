@@ -1,4 +1,6 @@
+import { ActivityStats } from "@/components/dashboard/activity-stats";
 import { DashboardHero, PrivacyNote, type EngineState } from "@/components/dashboard/hero";
+import { DeveloperCard } from "@/components/dashboard/developer-card";
 import { ToolExplorer } from "@/components/dashboard/tool-explorer";
 import { getServerConfig } from "@/lib/config/env";
 import { createStirlingClient } from "@/lib/stirling/client";
@@ -26,6 +28,13 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
       <DashboardHero engine={engine} />
+      <section
+        aria-label="Workspace activity and developer credits"
+        className="grid gap-4 lg:grid-cols-[1.5fr_1fr]"
+      >
+        <ActivityStats />
+        <DeveloperCard />
+      </section>
       <ToolExplorer />
       <PrivacyNote />
     </div>

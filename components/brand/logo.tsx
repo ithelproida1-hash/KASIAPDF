@@ -1,29 +1,24 @@
+import Image from "next/image";
+
 import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "brand-gradient inline-grid size-9 shrink-0 place-items-center rounded-[10px] text-white shadow-[0_4px_12px_-4px_oklch(0.5_0.2_280/0.7)]",
+        "inline-flex h-9 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 ring-1 ring-black/5",
         className,
       )}
       aria-hidden="true"
     >
-      <svg viewBox="0 0 24 24" fill="none" className="size-5">
-        <path
-          d="M6.75 3.75h6.5l4.5 4.5v11a1 1 0 0 1-1 1H6.75a1 1 0 0 1-1-1V4.75a1 1 0 0 1 1-1Z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M13.25 3.75v4.5h4.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path d="M9 13h6M9 16.25h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
+      <Image
+        src="/logo.jpg"
+        alt=""
+        width={387}
+        height={195}
+        preload
+        className="h-full w-full object-contain"
+      />
     </span>
   );
 }

@@ -10,7 +10,7 @@ import { z } from "zod";
  * components, tests).
  */
 
-const DEFAULT_APP_NAME = "Company PDF Tools";
+const DEFAULT_APP_NAME = "Jindal Kasia PDF";
 
 const numeric = (options: { min: number; max: number; fallback: number }) =>
   z
@@ -37,6 +37,7 @@ const envSchema = z
     MAX_FILES_PER_JOB: numeric({ min: 1, max: 100, fallback: 10 }),
     MAX_TOTAL_UPLOAD_MB: numeric({ min: 1, max: 4_096, fallback: 250 }),
     RATE_LIMIT_PER_MINUTE: numeric({ min: 1, max: 1_000, fallback: 30 }),
+    UPLOAD_BACKUP_DIR: z.string().optional(),
     URL_ALLOWLIST: z.string().optional(),
     CLOUDFLARE_ACCESS_CLIENT_ID: z.string().trim().optional(),
     CLOUDFLARE_ACCESS_CLIENT_SECRET: z.string().trim().optional(),
@@ -80,6 +81,11 @@ export type ServerConfig = {
   };
   security: {
     urlAllowlist: string[];
+  };
+  backup: {
+    enabled: boolean;
+    /** Absolute or working-directory-relative folder for archived uploads. */
+    directory: string | null;
   };
 };
 
@@ -133,6 +139,17 @@ export function parseServerConfig(env: EnvSource): ServerConfig {
   const accessClientId = parsed.CLOUDFLARE_ACCESS_CLIENT_ID;
   const accessClientSecret = parsed.CLOUDFLARE_ACCESS_CLIENT_SECRET;
 
+  // Uploads are archived locally by default. An explicit empty value or
+  // "off"/"false"/"none" disables the backup (useful for tests and ephemeral
+  // deployments).
+  const rawBackup = parsed.UPLOAD_BACKUP_DIR?.trim();
+  const backupDisabled =
+    rawBackup !== undefined && ["", "off", "false", "none"].includes(rawBackup.toLowerCase());
+  const backupDirectory =
+    backupDisabled || (rawBackup === undefined && parsed.NODE_ENV === "test")
+      ? null
+      : rawBackup || "storage/uploads";
+
   return {
     appName: env.NEXT_PUBLIC_APP_NAME?.trim() || DEFAULT_APP_NAME,
     appVersion: packageJson.version,
@@ -157,6 +174,10 @@ export function parseServerConfig(env: EnvSource): ServerConfig {
         .split(",")
         .map((entry) => entry.trim().toLowerCase())
         .filter(Boolean),
+    },
+    backup: {
+      enabled: backupDirectory !== null,
+      directory: backupDirectory,
     },
   };
 }

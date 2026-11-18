@@ -49,6 +49,16 @@ describe("ToolWorkspace", () => {
     ["rotate-pdf", "Rotate PDF", "Rotate PDF"],
     ["jpg-to-pdf", "JPG to PDF", "Create PDF"],
     ["pdf-to-jpg", "PDF to JPG", "Convert to images"],
+    ["remove-pages", "Remove Pages", "Remove pages"],
+    ["watermark-pdf", "Watermark PDF", "Add watermark"],
+    ["protect-pdf", "Protect PDF", "Protect PDF"],
+    ["edit-pdf", "Edit PDF", "Add text"],
+    ["pdf-forms", "PDF Forms", "Process form"],
+    ["sign-pdf", "Sign PDF", "Sign PDF"],
+    ["compare-pdf", "Compare PDF", "Compare PDFs"],
+    ["pdf-to-markdown", "PDF to Markdown", "Convert to Markdown"],
+    ["workflows", "Workflows", "Run workflow"],
+    ["scan-pdf", "Scan PDF", "Create PDF"],
   ])("renders the %s workspace with its primary action disabled", (toolId, name, action) => {
     const { container } = render(<ToolWorkspace toolId={toolId} />);
 
@@ -110,6 +120,28 @@ describe("ToolWorkspace", () => {
     expect(runPdfTool).not.toHaveBeenCalled();
   });
 
+  it("reveals manual crop coordinates only when auto-crop is off", async () => {
+    const user = userEvent.setup();
+    render(<ToolWorkspace toolId="crop-pdf" />);
+
+    expect(screen.queryByLabelText("Left (x)")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: /auto-crop margins/i }));
+
+    expect(await screen.findByLabelText("Left (x)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Height")).toBeInTheDocument();
+  });
+
+  it("renders password and multi-line fields with the right input types", () => {
+    const protectedTool = render(<ToolWorkspace toolId="protect-pdf" />);
+    expect(screen.getByLabelText("Open password")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Owner password")).toHaveAttribute("type", "password");
+    protectedTool.unmount();
+
+    render(<ToolWorkspace toolId="redact-pdf" />);
+    expect(screen.getByLabelText(/words or phrases to redact/i).tagName).toBe("TEXTAREA");
+  });
+
   it("rejects unsupported files with a clear message", async () => {
     const { container } = render(<ToolWorkspace toolId="merge-pdf" />);
 
@@ -123,5 +155,40 @@ describe("ToolWorkspace", () => {
     // The invalid file must never enter the selected list.
     expect(screen.queryByText("not-a-pdf.txt")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /merge pdfs/i })).toBeDisabled();
+  });
+
+  it("hides the uploader for URL-only tools", () => {
+    const { container } = render(<ToolWorkspace toolId="web-to-pdf" />);
+
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.getByLabelText("Web address")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /capture page/i })).toBeEnabled();
+  });
+
+  it("switches signature fields between typed and certificate modes", async () => {
+    const user = userEvent.setup();
+    render(<ToolWorkspace toolId="sign-pdf" />);
+
+    expect(screen.getByLabelText("Signature text")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Signer name")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Certificate" }));
+
+    expect(await screen.findByLabelText("Signer name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Reason")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Signature text")).not.toBeInTheDocument();
+  });
+
+  it("shows form JSON only when filling a PDF form", async () => {
+    const user = userEvent.setup();
+    render(<ToolWorkspace toolId="pdf-forms" />);
+
+    expect(screen.getByLabelText("Field values (JSON)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Field values (JSON)")).not.toBeInTheDocument();
+    });
   });
 });

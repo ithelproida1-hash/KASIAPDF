@@ -8,6 +8,7 @@ import { executeTool } from "@/lib/pdf/tool-specs";
 import { getToolBySlug } from "@/lib/pdf/tools";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { isDeclaredLengthOverLimit, validateUploads } from "@/lib/security/validation";
+import { archiveUploads } from "@/lib/storage/upload-archive";
 import { createStirlingClient } from "@/lib/stirling/client";
 import { createId } from "@/lib/utils";
 
@@ -89,6 +90,13 @@ export async function handlePdfToolRequest(request: Request, toolSlug: string): 
         details: { field: validation.field },
       });
     }
+
+    await archiveUploads({
+      requestId,
+      toolId: tool.id,
+      files,
+      directory: config.backup.enabled ? config.backup.directory : null,
+    });
 
     const client = createStirlingClient(config.stirling);
     const { result, filename } = await executeTool(tool, client, files, validation.values);

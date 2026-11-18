@@ -13,6 +13,7 @@ export function UploadDropzone({
   onFiles,
   fileCount,
   limitsText,
+  capture,
 }: {
   accept: string;
   multiple: boolean;
@@ -20,6 +21,8 @@ export function UploadDropzone({
   onFiles: (files: File[]) => void;
   fileCount: number;
   limitsText: string;
+  /** Hint mobile browsers to open the camera directly. */
+  capture?: "user" | "environment";
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = React.useState(false);
@@ -110,6 +113,7 @@ export function UploadDropzone({
         className="hidden"
         accept={accept}
         multiple={multiple}
+        capture={capture}
         disabled={disabled}
         onChange={(event) => {
           handleFiles(event.target.files);

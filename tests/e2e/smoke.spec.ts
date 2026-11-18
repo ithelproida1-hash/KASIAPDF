@@ -10,12 +10,17 @@ const SAMPLE_PDF = path.join(FIXTURES, "pdfs", "sample-a.pdf");
 const FAKE_RESULT = readFileSync(SAMPLE_PDF);
 
 test.describe("Phase 1 smoke", () => {
-  test("shows developer credits and paints fireworks on click", async ({ page }) => {
+  test("shows branding, activity counts and developer credits", async ({ page }) => {
     await page.goto("/dashboard");
 
+    await expect(page.getByText("Jindal Kasia PDF").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sanjay Nayak" })).toBeVisible();
     await expect(page.getByText("Developed by Sanjay Nayak")).toBeVisible();
-    await expect(page.getByText(/Made with/)).toContainText("in India");
-    await expect(page.getByText(/For internal use only/)).toBeVisible();
+    await expect(page.getByText(/Made with/).first()).toContainText("in India");
+    await expect(page.getByText(/For internal use only/).first()).toBeVisible();
+
+    await expect(page.getByTestId("daily-visitors")).not.toHaveText("—", { timeout: 10_000 });
+    await expect(page.getByTestId("online-users")).not.toHaveText("—", { timeout: 10_000 });
 
     await page.mouse.click(480, 320);
 
@@ -85,8 +90,61 @@ test.describe("Phase 1 smoke", () => {
     await expect(page.getByRole("button", { name: "Download" })).toBeEnabled();
   });
 
-  test("engine errors are surfaced safely", async ({ page }) => {
-    await page.route("**/api/pdf/merge-pdf", async (route) => {
+  test("PDF to Word enables OCR for scanned pages by default", async ({ page }) => {
+    await page.goto("/pdf-to-word");
+
+    const ocrSwitch = page.getByRole("switch", { name: /recognize scanned text/i });
+    await expect(ocrSwitch).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByLabel("Document language")).toBeVisible();
+
+    await ocrSwitch.click();
+
+    await expect(ocrSwitch).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByLabel("Document language")).toHaveCount(0);
+  });
+
+  test("renders the editing and automation tool pages", async ({ page }) => {
+    const pages = [
+      ["/edit-pdf", "Edit PDF"],
+      ["/pdf-forms", "PDF Forms"],
+      ["/sign-pdf", "Sign PDF"],
+      ["/compare-pdf", "Compare PDF"],
+      ["/pdf-to-markdown", "PDF to Markdown"],
+      ["/web-to-pdf", "Web to PDF"],
+      ["/workflows", "Workflows"],
+      ["/scan-pdf", "Scan PDF"],
+    ] as const;
+
+    for (const [route, heading] of pages) {
+      await page.goto(route);
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    }
+  });
+
+  test("web to PDF runs without a file uploader", async ({ page }) => {
+    await page.route("**/api/pdf/web-to-pdf", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        headers: {
+          "content-disposition": 'attachment; filename="web-page.pdf"',
+          "x-request-id": "req-e2e-web",
+        },
+        body: FAKE_RESULT,
+      });
+    });
+
+    await page.goto("/web-to-pdf");
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+
+    await page.getByLabel("Web address").fill("https://example.com/article");
+    await page.getByRole("button", { name: "Capture page" }).click();
+
+    await expect(page.getByRole("heading", { name: "Your file is ready" })).toBeVisible();
+    await expect(page.getByText("web-page.pdf")).toBeVisible();
+  });
+
+  test("engine errors are surfaced safely", async ({ page }) => {    await page.route("**/api/pdf/merge-pdf", async (route) => {
       await route.fulfill({
         status: 503,
         contentType: "application/json",

@@ -22,7 +22,7 @@ import {
 } from "@/lib/api/pdf-client";
 import { inspectFile, totalSizeOf, type SelectedFile } from "@/lib/pdf/client-files";
 import { getToolForm, validateToolValues, type ToolValues } from "@/lib/pdf/tool-options";
-import { getCategory, getToolById } from "@/lib/pdf/tools";
+import { getCategory, getToolById, type ToolInputSpec } from "@/lib/pdf/tools";
 import { formatBytes } from "@/lib/utils";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -32,6 +32,33 @@ const ACTION_LABELS: Record<string, string> = {
   "rotate-pdf": "Rotate PDF",
   "jpg-to-pdf": "Create PDF",
   "pdf-to-jpg": "Convert to images",
+  "remove-pages": "Remove pages",
+  "extract-pages": "Extract pages",
+  "organize-pdf": "Organize PDF",
+  "pdf-to-word": "Convert to Word",
+  "pdf-to-powerpoint": "Convert to PowerPoint",
+  "pdf-to-excel": "Convert to Excel",
+  "word-to-pdf": "Convert to PDF",
+  "powerpoint-to-pdf": "Convert to PDF",
+  "excel-to-pdf": "Convert to PDF",
+  "html-to-pdf": "Render PDF",
+  "pdf-to-pdfa": "Convert to PDF/A",
+  "watermark-pdf": "Add watermark",
+  "page-numbers": "Add page numbers",
+  "crop-pdf": "Crop PDF",
+  "unlock-pdf": "Unlock PDF",
+  "protect-pdf": "Protect PDF",
+  "ocr-pdf": "Run OCR",
+  "repair-pdf": "Repair PDF",
+  "redact-pdf": "Redact PDF",
+  "edit-pdf": "Add text",
+  "pdf-forms": "Process form",
+  "sign-pdf": "Sign PDF",
+  "compare-pdf": "Compare PDFs",
+  "pdf-to-markdown": "Convert to Markdown",
+  "web-to-pdf": "Capture page",
+  workflows: "Run workflow",
+  "scan-pdf": "Create PDF",
 };
 
 type Phase = "idle" | "uploading" | "processing" | "success" | "error";
@@ -257,31 +284,36 @@ export function ToolWorkspace({ toolId }: { toolId: string }) {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
           <div className="space-y-4">
-            <UploadDropzone
-              accept={tool.input.accept}
-              multiple={tool.input.multiple}
-              disabled={busy}
-              onFiles={(incoming) => void addFiles(incoming)}
-              fileCount={files.length}
-              limitsText={`${describeAccept(tool.input.kinds)} · up to ${limits.maxFileSizeMb} MB each · ${maxFiles} file${maxFiles === 1 ? "" : "s"} max`}
-            />
+            {maxFiles > 0 ? (
+              <>
+                <UploadDropzone
+                  accept={tool.input.accept}
+                  multiple={tool.input.multiple}
+                  disabled={busy}
+                  onFiles={(incoming) => void addFiles(incoming)}
+                  fileCount={files.length}
+                  capture={tool.id === "scan-pdf" ? "environment" : undefined}
+                  limitsText={`${describeAccept(tool.input)} · up to ${limits.maxFileSizeMb} MB each · ${maxFiles} file${maxFiles === 1 ? "" : "s"} max`}
+                />
 
-            <SelectedFileList
-              files={files}
-              ordered={tool.input.ordered}
-              onRemove={removeFile}
-              onMove={moveFile}
-              onPreview={openPreview}
-              disabled={busy}
-            />
+                <SelectedFileList
+                  files={files}
+                  ordered={tool.input.ordered}
+                  onRemove={removeFile}
+                  onMove={moveFile}
+                  onPreview={openPreview}
+                  disabled={busy}
+                />
 
-            {files.length > 0 ? (
-              <p className="text-muted-foreground text-[11px]">
-                {files.length} file{files.length === 1 ? "" : "s"} · {formatBytes(totalBytes)}
-                {tool.input.ordered && files.length > 1
-                  ? " · use the arrows to set the processing order"
-                  : ""}
-              </p>
+                {files.length > 0 ? (
+                  <p className="text-muted-foreground text-[11px]">
+                    {files.length} file{files.length === 1 ? "" : "s"} · {formatBytes(totalBytes)}
+                    {tool.input.ordered && files.length > 1
+                      ? " · use the arrows to set the processing order"
+                      : ""}
+                  </p>
+                ) : null}
+              </>
             ) : null}
 
             {phase === "error" && error ? (
@@ -350,8 +382,8 @@ export function ToolWorkspace({ toolId }: { toolId: string }) {
                 className="text-success mt-0.5 size-3.5 shrink-0"
                 aria-hidden="true"
               />
-              Files are held in memory for this request only and are never written to permanent
-              storage.
+              Files are sent through the company server. A local backup copy of every upload
+              is kept on the company machine for recovery.
             </p>
           </aside>
         </div>
@@ -368,15 +400,27 @@ export function ToolWorkspace({ toolId }: { toolId: string }) {
   );
 }
 
-function describeAccept(kinds: readonly string[]): string {
+function describeAccept(input: ToolInputSpec): string {
+  if (input.kinds.some((kind) => kind === "zip" || kind === "ole")) {
+    return input.accept
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.startsWith("."))
+      .map((entry) => entry.slice(1).toUpperCase())
+      .join(", ");
+  }
+
   const labels: Record<string, string> = {
     pdf: "PDF",
     jpeg: "JPG",
     png: "PNG",
     webp: "WebP",
     gif: "GIF",
+    tiff: "TIFF",
+    bmp: "BMP",
+    html: "HTML",
   };
 
-  const values = kinds.map((kind) => labels[kind] ?? kind.toUpperCase());
+  const values = input.kinds.map((kind) => labels[kind] ?? kind.toUpperCase());
   return values.length > 0 ? values.join(", ") : "Supported files";
 }

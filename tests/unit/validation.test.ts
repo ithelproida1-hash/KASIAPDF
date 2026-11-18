@@ -35,6 +35,19 @@ describe("detectFileKind", () => {
     expect(detectFileKind(new TextEncoder().encode("RIFF....WEBP"))).toBe("webp");
   });
 
+  it("identifies Office containers and HTML documents", () => {
+    expect(detectFileKind(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0]))).toBe("zip");
+    expect(
+      detectFileKind(
+        new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]),
+      ),
+    ).toBe("ole");
+    expect(detectFileKind(new TextEncoder().encode("<!doctype html><html></html>"))).toBe("html");
+    expect(detectFileKind(new TextEncoder().encode("  \n<html><body>x</body></html>"))).toBe(
+      "html",
+    );
+  });
+
   it("returns unknown for unsupported content", () => {
     expect(detectFileKind(new TextEncoder().encode("hello world"))).toBe("unknown");
     expect(detectFileKind(new Uint8Array())).toBe("unknown");
@@ -148,6 +161,60 @@ describe("validateUploads", () => {
     await expectAppError(
       validateUploads([empty, fixtureFile("pdfs/sample-a.pdf")], PDF_INPUT, LIMITS),
       "INVALID_INPUT",
+    );
+  });
+});
+
+describe("office and HTML uploads", () => {
+  const OFFICE_INPUT: ToolInputSpec = {
+    kinds: ["zip", "ole"],
+    multiple: false,
+    minFiles: 1,
+    maxFiles: 1,
+    ordered: false,
+    accept: ".doc,.docx,.odt,.rtf",
+  };
+
+  const HTML_INPUT: ToolInputSpec = {
+    kinds: ["html"],
+    multiple: false,
+    minFiles: 1,
+    maxFiles: 1,
+    ordered: false,
+    accept: ".html,.htm",
+  };
+
+  it("preserves a DOCX extension and sends the Word MIME type", async () => {
+    const docx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0])], "Report.DOCX");
+    const result = await validateUploads([docx], OFFICE_INPUT, LIMITS);
+
+    expect(result.files[0]?.filename).toBe("Report.DOCX");
+    expect(result.files[0]?.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+  });
+
+  it("accepts legacy OLE documents", async () => {
+    const legacy = new File(
+      [new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0])],
+      "legacy.doc",
+    );
+    const result = await validateUploads([legacy], OFFICE_INPUT, LIMITS);
+
+    expect(result.files[0]?.filename).toBe("legacy.doc");
+    expect(result.files[0]?.contentType).toBe("application/msword");
+  });
+
+  it("accepts HTML only for tools that declare it", async () => {
+    const html = new File(["<!doctype html><html></html>"], "page.html", { type: "text/html" });
+
+    const accepted = await validateUploads([html], HTML_INPUT, LIMITS);
+    expect(accepted.files[0]?.filename).toBe("page.html");
+    expect(accepted.files[0]?.contentType).toBe("text/html");
+
+    await expectAppError(
+      validateUploads([html, html], PDF_INPUT, LIMITS),
+      "UNSUPPORTED_FILE_TYPE",
     );
   });
 });
