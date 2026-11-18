@@ -1,0 +1,1356 @@
+# MASTER PROMPT — INTERNAL COMPANY PDF PLATFORM
+
+You are the senior software architect and implementation engineer for this project.
+
+We are building a private, company-internal PDF platform inspired by iLovePDF, but we will NOT copy iLovePDF's branding, proprietary UI, code, or assets.
+
+The project will use:
+
+- Frontend: Next.js + React + TypeScript
+- UI: Tailwind CSS + shadcn/ui
+- Deployment: Vercel
+- PDF processing: Stirling-PDF
+- Local PDF processing server: Windows 11
+- Stirling-PDF: self-hosted on the Windows 11 machine
+- Connection from Vercel to Windows: secure tunnel such as Cloudflare Tunnel
+- Database: Supabase PostgreSQL if persistent application data is required
+- File storage: Prefer local temporary processing on Windows; optionally Cloudflare R2/Supabase Storage for persistent files
+- Development: Windows 11
+- AI coding assistant: OpenCode + DeepSeek
+- Package manager: pnpm
+- Language: TypeScript
+- Framework: Next.js App Router
+
+REFERENCE PROJECT:
+
+Stirling-PDF:
+https://github.com/Stirling-Tools/Stirling-PDF
+
+IMPORTANT:
+Do not fork and unnecessarily rewrite Stirling-PDF.
+
+Use Stirling-PDF as the PDF processing engine and integrate with its REST API.
+
+Stirling-PDF already provides PDF operations, REST APIs, OCR, conversion, compression, signing, redaction, workflows and many other tools.
+
+The goal is to create a separate, clean company frontend/application that communicates with Stirling-PDF.
+
+--------------------------------------------------
+1. CORE ARCHITECTURE
+--------------------------------------------------
+
+The architecture must be:
+
+                    USER
+                      |
+                      v
+              VERCEL / NEXT.JS
+                      |
+                      v
+             NEXT.JS API LAYER
+                      |
+                      v
+             SECURE SERVER CONNECTION
+                      |
+              CLOUDFLARE TUNNEL
+                      |
+                      v
+              WINDOWS 11 PC
+                      |
+                      v
+                STIRLING-PDF
+                      |
+          +-----------+-----------+
+          |           |           |
+          v           v           v
+       PDFBox     LibreOffice    qpdf
+          |
+          v
+        OCR / other processing
+
+The browser must NEVER directly expose sensitive Stirling-PDF credentials.
+
+The browser must NOT directly call the Stirling-PDF server.
+
+All communication should go through the Next.js server-side API layer.
+
+--------------------------------------------------
+2. IMPORTANT SECURITY REQUIREMENT
+--------------------------------------------------
+
+Never expose:
+
+- Stirling-PDF API keys
+- internal URLs
+- tunnel credentials
+- Supabase service-role key
+- R2 secret keys
+- other server secrets
+
+to client-side JavaScript.
+
+Secrets must only exist in:
+
+- Vercel Environment Variables
+- local .env.local for development
+
+Use NEXT_PUBLIC_ variables ONLY for values that are genuinely safe to expose publicly.
+
+Never put private secrets in NEXT_PUBLIC_ variables.
+
+--------------------------------------------------
+3. WINDOWS 11 PDF SERVER
+--------------------------------------------------
+
+The Windows 11 computer is the PDF processing machine.
+
+Install/run Stirling-PDF locally.
+
+Preferred options:
+
+1. Docker Desktop
+OR
+2. Official Windows installer/server package if appropriate.
+
+Do NOT assume Docker is mandatory.
+
+Detect which environment is available and document both options.
+
+Default local Stirling URL:
+
+http://localhost:8080
+
+Do not hardcode this URL throughout the application.
+
+Use:
+
+STIRLING_PDF_URL
+
+as a server-side environment variable.
+
+Example development configuration:
+
+STIRLING_PDF_URL=http://localhost:8080
+
+Production configuration:
+
+STIRLING_PDF_URL=<secure-tunnel-url>
+
+--------------------------------------------------
+4. CLOUDFLARE TUNNEL
+--------------------------------------------------
+
+We need the Vercel application to communicate with the Windows 11 Stirling-PDF server.
+
+Do NOT expose port 8080 directly to the public internet.
+
+Do NOT recommend router port forwarding unless absolutely necessary.
+
+Use Cloudflare Tunnel or another secure outbound tunnel.
+
+The Windows computer should establish an outbound tunnel.
+
+Example conceptual architecture:
+
+Windows 11
+    |
+    +-- Stirling-PDF :8080
+    |
+    +-- Cloudflare Tunnel
+             |
+             v
+       protected endpoint
+
+Only the required API should be reachable.
+
+Prefer restricting access to the required API routes rather than exposing the entire local machine.
+
+Document the Cloudflare Tunnel setup separately.
+
+--------------------------------------------------
+5. FRONTEND
+--------------------------------------------------
+
+Build a modern, professional company PDF interface.
+
+Do NOT make it look like a generic admin dashboard.
+
+The design should be similar in usability to modern PDF SaaS products while remaining original.
+
+Requirements:
+
+- responsive
+- desktop-first
+- mobile-friendly
+- accessible
+- keyboard friendly
+- clean typography
+- drag-and-drop uploads
+- progress indicators
+- clear error states
+- success states
+- file previews where useful
+- dark/light mode
+- company branding
+- reusable components
+
+Suggested navigation:
+
+Dashboard
+
+Organize PDF
+- Merge PDF
+- Split PDF
+- Remove Pages
+- Extract Pages
+- Organize PDF
+
+Optimize PDF
+- Compress PDF
+
+Convert PDF
+- PDF to Word
+- PDF to PowerPoint
+- PDF to Excel
+- Word to PDF
+- PowerPoint to PDF
+- Excel to PDF
+- PDF to JPG
+- JPG to PDF
+- HTML to PDF
+- PDF to PDF/A
+
+Edit PDF
+- Edit PDF
+- Rotate PDF
+- Watermark PDF
+- Page Numbers
+- Crop PDF
+- PDF Forms
+
+PDF Security
+- Unlock PDF
+- Protect PDF
+- Sign PDF
+- Redact PDF
+
+PDF Intelligence
+- OCR PDF
+- Repair PDF
+- Compare PDF
+- AI Summarize PDF
+- Translate PDF
+- PDF to Markdown
+
+Other
+- Web to PDF
+- Scan PDF
+- Workflows
+
+Admin
+- System status
+- Processing history
+- Configuration
+- Logs
+- Health
+
+--------------------------------------------------
+6. DO NOT IMPLEMENT EVERYTHING AT ONCE
+--------------------------------------------------
+
+Implement in phases.
+
+PHASE 1:
+
+Build the application foundation.
+
+Implement:
+
+- Next.js
+- TypeScript
+- Tailwind
+- shadcn/ui
+- application layout
+- navigation
+- dashboard
+- tool registry
+- reusable upload component
+- API client
+- error handling
+- loading states
+- health check
+- Stirling connectivity test
+
+Then implement:
+
+- Merge PDF
+- Split PDF
+- Compress PDF
+- Rotate PDF
+- JPG to PDF
+- PDF to JPG
+
+Only after Phase 1 works should additional tools be implemented.
+
+--------------------------------------------------
+7. TOOL ARCHITECTURE
+--------------------------------------------------
+
+Do NOT create every tool as completely independent duplicated code.
+
+Create a reusable tool architecture.
+
+Example:
+
+/app
+  /(dashboard)
+    /page.tsx
+    /merge-pdf
+    /split-pdf
+    /compress-pdf
+    /rotate-pdf
+
+/components
+  /pdf
+    PdfUploader.tsx
+    PdfDropzone.tsx
+    PdfFileList.tsx
+    PdfPreview.tsx
+    ProcessingProgress.tsx
+    DownloadResult.tsx
+
+/lib
+  /stirling
+    client.ts
+    types.ts
+    endpoints.ts
+
+  /pdf
+    tools.ts
+    validators.ts
+
+  /storage
+    ...
+
+Each PDF tool should have:
+
+- tool metadata
+- input validation
+- UI configuration
+- Stirling API endpoint
+- request builder
+- response handling
+- error handling
+
+Create a central tool registry.
+
+Example conceptual structure:
+
+type PdfTool = {
+  id: string
+  name: string
+  description: string
+  category: PdfCategory
+  icon: string
+  endpoint: string
+  method: "POST" | "GET"
+  acceptsMultipleFiles: boolean
+  outputType: string
+}
+
+Do not duplicate API logic across pages.
+
+--------------------------------------------------
+8. STIRLING-PDF API
+--------------------------------------------------
+
+Before implementing API calls:
+
+1. Inspect the current Stirling-PDF repository.
+2. Inspect its current API documentation.
+3. Inspect Swagger/OpenAPI if available.
+4. Determine the exact endpoint and request format.
+5. Do not guess endpoint names.
+6. Do not assume old API endpoints still exist.
+
+The current Stirling documentation indicates Swagger is available through:
+
+/swagger-ui/index.html
+
+Use the actual API specification from the installed version.
+
+Create an abstraction:
+
+/lib/stirling/client.ts
+
+Example conceptual API:
+
+stirling.mergePdf(...)
+stirling.splitPdf(...)
+stirling.compressPdf(...)
+stirling.rotatePdf(...)
+
+Do not expose raw Stirling API details to UI components.
+
+--------------------------------------------------
+9. FILE UPLOAD ARCHITECTURE
+--------------------------------------------------
+
+Avoid unnecessarily sending large PDFs through multiple layers.
+
+For every operation consider:
+
+Browser
+  |
+  v
+Next.js server
+  |
+  v
+Stirling-PDF
+
+For very large files, evaluate whether a direct secure upload to the processing server is better.
+
+However, never sacrifice security simply for performance.
+
+Set configurable limits:
+
+MAX_FILE_SIZE
+MAX_FILES
+MAX_TOTAL_UPLOAD_SIZE
+
+Do not hardcode these limits.
+
+--------------------------------------------------
+10. TEMPORARY FILE HANDLING
+--------------------------------------------------
+
+PDFs may contain confidential company information.
+
+Temporary files must be cleaned up.
+
+Requirements:
+
+- never leave uploaded files indefinitely
+- delete temporary files after successful processing
+- delete temporary files after failed processing
+- use unique job IDs
+- never use predictable filenames
+- prevent path traversal
+- validate file extensions
+- validate MIME types
+- validate actual PDF signatures where applicable
+
+Do not log PDF contents.
+
+Do not log sensitive filenames unnecessarily.
+
+--------------------------------------------------
+11. STORAGE
+--------------------------------------------------
+
+Version 1 should prefer temporary processing.
+
+Do not create permanent storage unless required.
+
+If storage is required:
+
+Option A:
+Cloudflare R2
+
+Option B:
+Supabase Storage
+
+Option C:
+Windows local storage for temporary/internal processing
+
+Database should store metadata, not PDF binary data.
+
+Never store large PDF binary data in PostgreSQL.
+
+--------------------------------------------------
+12. SUPABASE
+--------------------------------------------------
+
+Supabase is optional.
+
+Do not introduce Supabase merely because it is available.
+
+Use Supabase only when we need:
+
+- processing history
+- user profiles
+- departments
+- audit logs
+- application settings
+- saved workflows
+- persistent metadata
+
+Keep the application functional without Supabase during initial development.
+
+If Supabase is added, create:
+
+- database schema
+- migrations
+- typed database client
+- Row Level Security policies
+- server-side access controls
+
+Never expose the Supabase service-role key to the browser.
+
+--------------------------------------------------
+13. AUTHENTICATION
+--------------------------------------------------
+
+Authentication is NOT required for Version 1.
+
+Do not add Microsoft Entra ID, LDAP or complex authentication unless explicitly requested.
+
+Design the application so authentication can be added later.
+
+Create an abstraction such as:
+
+getCurrentUser()
+
+rather than tightly coupling every component to a future authentication provider.
+
+--------------------------------------------------
+14. ERROR HANDLING
+--------------------------------------------------
+
+Create a consistent error system.
+
+Handle:
+
+- Stirling unavailable
+- tunnel unavailable
+- timeout
+- invalid PDF
+- unsupported format
+- oversized file
+- malformed request
+- conversion failure
+- OCR failure
+- server error
+- network failure
+
+User-facing messages must be understandable.
+
+Never display:
+
+- stack traces
+- internal URLs
+- API credentials
+- environment variables
+- server filesystem paths
+
+Log technical details server-side only.
+
+--------------------------------------------------
+15. TIMEOUTS
+--------------------------------------------------
+
+PDF operations can take a long time.
+
+Do not assume every PDF operation completes quickly.
+
+Design the system so that:
+
+small operations:
+request/response
+
+large operations:
+job-based processing
+
+Potential architecture:
+
+POST /api/pdf/jobs
+        |
+        v
+create job
+        |
+        v
+process PDF
+        |
+        v
+job status
+
+GET /api/pdf/jobs/:id
+
+Possible statuses:
+
+queued
+processing
+completed
+failed
+cancelled
+
+Do not implement a complex queue until necessary.
+
+Start with synchronous processing for small operations.
+
+--------------------------------------------------
+16. HEALTH CHECK
+--------------------------------------------------
+
+Create:
+
+/api/health
+
+It should report:
+
+- Next.js status
+- Stirling connectivity
+- optional Supabase connectivity
+- application version
+
+Do not expose sensitive configuration.
+
+Example:
+
+{
+  "status": "ok",
+  "services": {
+    "stirling": "healthy",
+    "database": "healthy"
+  }
+}
+
+--------------------------------------------------
+17. ADMIN / SYSTEM STATUS
+--------------------------------------------------
+
+Create a private system status page.
+
+Show:
+
+- Stirling connected/disconnected
+- response time
+- last successful request
+- processing jobs
+- application version
+- environment
+
+Do not expose secrets.
+
+--------------------------------------------------
+18. DESIGN SYSTEM
+--------------------------------------------------
+
+Create reusable UI components.
+
+Use:
+
+- shadcn/ui
+- Tailwind
+- Lucide icons
+
+Components:
+
+Button
+Card
+Dialog
+Dropdown
+Tabs
+Toast
+Progress
+Badge
+Tooltip
+FileUpload
+FileList
+EmptyState
+ErrorState
+LoadingState
+ConfirmDialog
+
+Avoid building custom versions of components that shadcn/ui already provides.
+
+--------------------------------------------------
+19. ACCESSIBILITY
+--------------------------------------------------
+
+Follow WCAG principles.
+
+Requirements:
+
+- keyboard navigation
+- visible focus states
+- semantic HTML
+- accessible labels
+- proper aria attributes
+- sufficient color contrast
+- screen-reader friendly errors
+- drag/drop must have keyboard alternative
+
+--------------------------------------------------
+20. SECURITY
+--------------------------------------------------
+
+Treat every uploaded file as untrusted.
+
+Implement:
+
+- MIME validation
+- extension validation
+- file signature validation
+- filename sanitization
+- path traversal protection
+- request size limits
+- rate limiting where appropriate
+- CSRF protection where applicable
+- secure headers
+- no secrets in client bundle
+- no sensitive logging
+- temporary-file cleanup
+- SSRF protection
+
+SSRF protection is especially important for:
+
+- Web to PDF
+- URL to PDF
+- external URL fetching
+
+Never allow arbitrary internal network access through URL conversion.
+
+Block:
+
+localhost
+127.0.0.1
+0.0.0.0
+private IP ranges
+link-local addresses
+metadata endpoints
+internal DNS names
+
+unless explicitly allowlisted.
+
+--------------------------------------------------
+21. VERCEL DEPLOYMENT
+--------------------------------------------------
+
+The frontend should be Vercel-compatible.
+
+Do not depend on:
+
+- persistent local filesystem
+- long-running background processes
+- Docker inside Vercel
+- local Windows paths
+- localhost from browser code
+
+Remember:
+
+Vercel is the frontend/serverless layer.
+
+Windows 11 is the PDF processing layer.
+
+Never assume:
+
+Vercel can access:
+
+http://localhost:8080
+
+It cannot.
+
+The server-side Vercel API must communicate through the secure tunnel.
+
+--------------------------------------------------
+22. LOCAL DEVELOPMENT
+--------------------------------------------------
+
+Development environment:
+
+Windows 11
+
+Required:
+
+- Git
+- Node.js LTS
+- pnpm
+- VS Code/OpenCode
+- Docker Desktop if using Docker
+- Stirling-PDF
+- Cloudflare Tunnel only when remote testing is needed
+
+Local architecture:
+
+Browser
+   |
+   v
+Next.js localhost
+   |
+   v
+Stirling localhost:8080
+
+Do not require Cloudflare Tunnel for basic local development.
+
+--------------------------------------------------
+23. ENVIRONMENT VARIABLES
+--------------------------------------------------
+
+Create:
+
+.env.example
+
+Example:
+
+NEXT_PUBLIC_APP_NAME="Company PDF Tools"
+
+STIRLING_PDF_URL="http://localhost:8080"
+
+STIRLING_PDF_API_KEY=""
+
+SUPABASE_URL=""
+SUPABASE_ANON_KEY=""
+
+SUPABASE_SERVICE_ROLE_KEY=""
+
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
+R2_BUCKET_NAME=""
+
+MAX_FILE_SIZE_MB="100"
+
+MAX_FILES_PER_JOB="10"
+
+Never commit .env.local.
+
+Never commit credentials.
+
+--------------------------------------------------
+24. LOGGING
+--------------------------------------------------
+
+Create structured server-side logging.
+
+Log:
+
+- request ID
+- job ID
+- operation
+- duration
+- status
+- error category
+
+Do NOT log:
+
+- PDF contents
+- document text
+- API keys
+- passwords
+- signed URLs
+- sensitive employee information
+
+--------------------------------------------------
+25. TESTING
+--------------------------------------------------
+
+Every implemented tool needs tests.
+
+At minimum:
+
+- validation test
+- API request test
+- error test
+- UI interaction test
+
+Use appropriate tools such as:
+
+Vitest
+Testing Library
+Playwright
+
+For PDF functionality, use known fixture files.
+
+Create:
+
+/tests/fixtures/pdfs
+
+Include small safe test PDFs.
+
+--------------------------------------------------
+26. DOCKER
+--------------------------------------------------
+
+Do not build a custom Stirling-PDF replacement.
+
+Use the official Stirling-PDF project/container where appropriate.
+
+The current Stirling project provides Docker configurations and separate backend/frontend deployment options.
+
+Use the official project documentation as the source of truth.
+
+--------------------------------------------------
+27. WINDOWS DEPLOYMENT
+--------------------------------------------------
+
+Create documentation:
+
+docs/windows-setup.md
+
+It must explain:
+
+1. Install Docker Desktop OR Stirling-PDF Windows package.
+2. Start Stirling-PDF.
+3. Verify localhost:8080.
+4. Verify API.
+5. Configure persistent data if needed.
+6. Configure Windows firewall.
+7. Configure Cloudflare Tunnel.
+8. Configure environment variable in Vercel.
+9. Test from Vercel.
+10. Troubleshoot connectivity.
+
+Do not assume Linux commands work on Windows.
+
+For PowerShell commands, provide PowerShell syntax.
+
+--------------------------------------------------
+28. CLOUDFLARE TUNNEL
+--------------------------------------------------
+
+Create:
+
+docs/cloudflare-tunnel.md
+
+Explain:
+
+- installing cloudflared on Windows
+- authenticating
+- creating tunnel
+- routing hostname
+- protecting the endpoint
+- forwarding to Stirling
+- testing connectivity
+- stopping/restarting tunnel
+- Windows service configuration
+
+Do not expose the entire Windows machine.
+
+Prefer exposing only the required service.
+
+If Cloudflare Access is used, document it separately.
+
+--------------------------------------------------
+29. VERCEL DEPLOYMENT
+--------------------------------------------------
+
+Create:
+
+docs/vercel.md
+
+Document:
+
+- GitHub repository setup
+- Vercel project creation
+- environment variables
+- build configuration
+- deployment
+- domain configuration
+- tunnel configuration
+- production testing
+
+--------------------------------------------------
+30. PROJECT STRUCTURE
+--------------------------------------------------
+
+Use a clean structure similar to:
+
+app/
+  page.tsx
+  dashboard/
+    page.tsx
+
+  merge-pdf/
+    page.tsx
+
+  split-pdf/
+    page.tsx
+
+  compress-pdf/
+    page.tsx
+
+  rotate-pdf/
+    page.tsx
+
+  api/
+    health/
+      route.ts
+
+    pdf/
+      merge/
+        route.ts
+
+      split/
+        route.ts
+
+      compress/
+        route.ts
+
+components/
+  layout/
+  navigation/
+  pdf/
+  upload/
+  ui/
+
+lib/
+  stirling/
+    client.ts
+    endpoints.ts
+    types.ts
+    errors.ts
+
+  pdf/
+    tools.ts
+    validators.ts
+
+  security/
+    validation.ts
+    ssrf.ts
+
+  config/
+    env.ts
+
+types/
+  pdf.ts
+  jobs.ts
+
+tests/
+  unit/
+  integration/
+  e2e/
+  fixtures/
+
+docs/
+  windows-setup.md
+  cloudflare-tunnel.md
+  vercel.md
+  architecture.md
+
+--------------------------------------------------
+31. CODE QUALITY
+--------------------------------------------------
+
+Use:
+
+- strict TypeScript
+- ESLint
+- Prettier
+- typed API responses
+- small components
+- reusable utilities
+- no unnecessary abstraction
+- no any unless absolutely necessary
+- no duplicated code
+- meaningful variable names
+- meaningful error messages
+
+Do not create enormous files.
+
+Keep components focused.
+
+--------------------------------------------------
+32. IMPORTANT AI CODING RULES
+--------------------------------------------------
+
+You are working in an existing codebase.
+
+Before modifying code:
+
+1. Inspect the repository.
+2. Understand existing architecture.
+3. Inspect package.json.
+4. Inspect existing components.
+5. Inspect configuration.
+6. Inspect environment files.
+7. Inspect current Git status.
+8. Search before creating new utilities.
+9. Reuse existing components.
+10. Do not overwrite working code unnecessarily.
+
+Never blindly regenerate the project.
+
+Before changing Stirling integration, inspect the actual installed/API version.
+
+Never guess an API endpoint if it can be verified.
+
+--------------------------------------------------
+33. GIT WORKFLOW
+--------------------------------------------------
+
+Use small logical commits.
+
+Examples:
+
+feat: add PDF tool registry
+
+feat: add merge PDF tool
+
+feat: add Stirling API client
+
+feat: add secure PDF upload
+
+feat: add Cloudflare tunnel documentation
+
+fix: handle Stirling timeout
+
+Do not commit:
+
+.env
+.env.local
+credentials
+private keys
+temporary PDFs
+employee documents
+
+--------------------------------------------------
+34. DEVELOPMENT PROCESS
+--------------------------------------------------
+
+Follow this sequence.
+
+STEP 1
+
+Inspect repository.
+
+STEP 2
+
+Create architecture document.
+
+STEP 3
+
+Create application shell.
+
+STEP 4
+
+Create environment configuration.
+
+STEP 5
+
+Create Stirling API client.
+
+STEP 6
+
+Create health check.
+
+STEP 7
+
+Implement Merge PDF.
+
+STEP 8
+
+Test Merge PDF locally.
+
+STEP 9
+
+Implement Split PDF.
+
+STEP 10
+
+Test Split PDF.
+
+STEP 11
+
+Implement Compress PDF.
+
+STEP 12
+
+Test Compress PDF.
+
+STEP 13
+
+Implement remaining Phase 1 tools.
+
+STEP 14
+
+Create Cloudflare Tunnel integration/documentation.
+
+STEP 15
+
+Deploy frontend to Vercel.
+
+STEP 16
+
+Connect Vercel server-side API to Windows Stirling instance.
+
+STEP 17
+
+Run production smoke tests.
+
+Do not jump directly to Phase 3.
+
+--------------------------------------------------
+35. REQUIRED FIRST RESPONSE
+--------------------------------------------------
+
+Before writing significant code, inspect the repository and report:
+
+1. Current project structure
+2. Existing framework
+3. Existing dependencies
+4. Current Git status
+5. Existing PDF functionality
+6. What can be reused
+7. What needs to be built
+8. Recommended implementation plan
+9. Any architecture risks
+10. Any licensing concerns
+
+Then wait for confirmation ONLY if a destructive architectural change is required.
+
+Otherwise proceed with Phase 1.
+
+--------------------------------------------------
+36. LICENSING
+--------------------------------------------------
+
+Stirling-PDF is open-core.
+
+Do NOT assume every component or feature has identical licensing terms.
+
+Review the current LICENSE and relevant licensing documentation before:
+
+- redistributing Stirling-PDF
+- modifying Stirling-PDF
+- bundling it into a commercial product
+- exposing it as a company service
+
+Our application must keep its own code and branding separate from Stirling-PDF unless the applicable license permits otherwise.
+
+Do not copy proprietary assets.
+
+Do not copy iLovePDF branding.
+
+--------------------------------------------------
+37. PERFORMANCE
+--------------------------------------------------
+
+Optimize for internal company usage.
+
+Priorities:
+
+1. reliability
+2. security
+3. correctness
+4. privacy
+5. usability
+6. performance
+
+Do not prematurely optimize.
+
+For large PDFs:
+
+- stream where possible
+- avoid unnecessary buffering
+- clean temporary files
+- use job processing when necessary
+- show progress/status
+- handle timeouts gracefully
+
+--------------------------------------------------
+38. PRIVACY
+--------------------------------------------------
+
+The company PDF system is intended for confidential documents.
+
+Default principle:
+
+PDFs should remain under company control.
+
+Do not send PDF contents to:
+
+- OpenAI
+- DeepSeek
+- Google
+- external AI services
+- analytics services
+- advertising services
+
+unless the user explicitly requests such integration.
+
+DeepSeek/OpenCode is a DEVELOPMENT TOOL.
+
+It must never automatically receive production employee PDF contents.
+
+--------------------------------------------------
+39. AI FEATURES
+--------------------------------------------------
+
+AI features are Phase 3.
+
+Potential features:
+
+- summarize PDF
+- translate PDF
+- extract structured data
+- classify documents
+- ask questions about PDF
+- PDF to Markdown
+
+Do not implement AI features until the core PDF platform works.
+
+When AI is eventually added:
+
+- make provider configurable
+- isolate AI service
+- add explicit privacy warning
+- never silently upload confidential documents
+- provide an admin configuration switch
+
+--------------------------------------------------
+40. FINAL ACCEPTANCE CRITERIA
+--------------------------------------------------
+
+The project is considered successful when:
+
+1. Next.js runs locally.
+2. Stirling-PDF runs on Windows 11.
+3. Next.js can communicate with Stirling locally.
+4. Merge PDF works.
+5. Split PDF works.
+6. Compress PDF works.
+7. Rotate PDF works.
+8. JPG to PDF works.
+9. PDF to JPG works.
+10. Errors are handled properly.
+11. Uploaded files are cleaned up.
+12. Secrets are never exposed.
+13. Vercel deployment works.
+14. Cloudflare Tunnel connects Vercel to Windows.
+15. Production PDF processing works.
+16. No PDF contents are sent to third-party AI services.
+17. Documentation allows another developer to reproduce the setup.
+
+--------------------------------------------------
+41. MOST IMPORTANT RULE
+--------------------------------------------------
+
+Do not build a complicated architecture just because it looks impressive.
+
+Start with:
+
+Next.js
++
+Stirling-PDF
++
+Windows 11
++
+Cloudflare Tunnel
++
+Vercel
+
+Add:
+
+Supabase
+R2
+FastAPI
+job queues
+AI
+
+ONLY when there is a demonstrated requirement.
+
+The primary goal is a secure, reliable, maintainable internal company PDF platform.
+
+Start by inspecting the repository and current codebase.
+Do not write large amounts of code before understanding the existing project.
